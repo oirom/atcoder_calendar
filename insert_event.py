@@ -10,6 +10,7 @@ from google.auth.transport.requests import Request
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
 import requests, re, bs4
+from datetime import datetime as dt
 
 def delete_brackets(s):
     """
@@ -36,6 +37,7 @@ def delete_brackets(s):
     """ recursive processing """
     return delete_brackets(s) if sum([1 if re.search(l_, s) else 0 for l_ in l]) > 0 else s
 
+
 def get_atcoder_schedule() :
     # atcoderのコンテストスケジュールをまとめたサイトのhtmlを取得
     res = requests.get('https://competitiveprogramming.info/atcoder/contests')
@@ -57,6 +59,7 @@ def get_atcoder_schedule() :
         elems[3*i] = s
 
     return elems
+
 
 def main(event):
     creds = None
@@ -80,7 +83,7 @@ def main(event):
 
     service = build('calendar', 'v3', credentials=creds)
 
-    event = service.events().insert(calendarId='uc6houuit9g1eg16nt0u6v8uoo@group.calendar.google.com', body=event).execute()
+    event = service.events().insert(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com', body=event).execute()
 
     print (event['id'])
 
@@ -88,22 +91,22 @@ def main(event):
 if __name__ == '__main__':
 
     event = {
-        'summary': '予定の名前',
-        #'location': 'Shibuya Office',
-        'description': '予定の説明',
+        'summary': '',
+        'location': '',
+        'description': '',
         'start': {
-            'dateTime': '2020-05-19T09:00:00',
+            'dateTime': '2020-01-01T00:00:00',
             'timeZone': 'Japan',
         },
         'end': {
-            'dateTime': '2020-05-19T17:00:00',
+            'dateTime': '2020-01-01T01:00:00',
             'timeZone': 'Japan',
         },
     }
 
     elems = get_atcoder_schedule()
 
-    for i in range(3):
+    for i in range(int(len(elems)/3)):
         event['start']['dateTime'] = str(elems[3*i])
         event['description'] = str(elems[3*i+1])
         event['summary'] = str(elems[3*i+2])
@@ -111,17 +114,22 @@ if __name__ == '__main__':
         tmp_time = str(elems[3*i])
         new_time = str(int(tmp_time[11:13])+1)[0:2]
         end_time = list(elems[3*i])
-        end_time[11] = new_time[0]
-        end_time[12] = new_time[1]
-        
-        event['end']['dateTime'] = "".join(end_time)
 
+        s = str(event['start']['dateTime']).replace("T", " ")
+        t = dt.strptime(s, '%Y-%m-%d %H:%M:%S')
+        
+        if (t.hour==23 or t.hour==0 or (t.hour==22 and t.minute>=30)) :
+            t = str(t + datetime.timedelta(days=1, hours=1, minutes=30)).replace(" ", "T")
+        else :
+            t = str(t + datetime.timedelta(hours=1, minutes=30)).replace(" ", "T")
+
+        event['end']['dateTime'] = t
+
+        print("AtCoder : ", i)
         print(event['summary'])
         print(event['description'])
         print(event['start']['dateTime'])
         print(event['end']['dateTime'])
+        print("=========================")
 
         main(event)
-
-
-    #main()

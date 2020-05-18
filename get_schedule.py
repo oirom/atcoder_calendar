@@ -44,8 +44,6 @@ def get_atcoder_schedule() :
     for i in range((int(len(elems)/3))):
         s = elems[3*i].replace(" ", "T")[0:19]
         elems[3*i] = s
-    
-
 
     return elems
 
@@ -53,4 +51,5 @@ def get_atcoder_schedule() :
 if __name__ == '__main__':
     
     elems = get_atcoder_schedule()
-    print(elems)
+    for i in range(int(len(elems)/3)):
+        print(elems[3*i])
