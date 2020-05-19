@@ -60,7 +60,7 @@ def get_atcoder_schedule() :
 
     return contest_name, start_date, end_date
 
-
+# google calender api を使う部分．サンプルそのまま
 def main(event):
     creds = None
     if os.path.exists('token.pickle'):
@@ -85,22 +85,28 @@ def main(event):
 
 if __name__ == '__main__':
 
+    # コンテスト名，開始時刻，終了時刻をそれぞれリスト形式で取得
     names, start_dates, end_dates = get_atcoder_schedule()
     
+    # 既にカレンダーに追加しているコンテスト名を読みこむ
     scheduled = []
     with open('data/schedule.txt', mode='rt') as f:
         for d in f:
             scheduled.append(d.replace('\n', ''))
     f.close()
 
+    # 取得した各コンテストについてループ
     for name, start, end in zip(names, start_dates, end_dates) :
         
         event['summary'] = name
         event['start']['dateTime'] = start
         event['end']['dateTime'] = end
         
+        # 既にカレンダーに追加済みであればその旨を出力
         if event['summary'] in scheduled :
             print('already registered!')
+        # まだカレンダーに追加していないコンテストであれば追加し，
+        # 追加済みリストにコンテスト名を書き込む
         else :
             main(event)
             with open('data/schedule.txt', mode='a') as f :
