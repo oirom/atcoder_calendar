@@ -1,5 +1,4 @@
 import requests, bs4, os, datetime
-from bs4 import BeautifulSoup
 from datetime import datetime as dt
 
 def get_atcoder_schedule() :
