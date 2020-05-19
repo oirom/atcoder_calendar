@@ -1,7 +1,7 @@
 from __future__ import print_function
 import datetime
 import pickle
-import os.path
+import os, os.path
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -9,7 +9,7 @@ from google.auth.transport.requests import Request
 # If modifying these scopes, delete the file token.pickle.
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-import requests, re, bs4, json, pprint
+import requests, re, bs4, shutil
 from collections import OrderedDict
 from datetime import datetime as dt
 
@@ -41,7 +41,7 @@ def delete_brackets(s):
 
 def get_atcoder_schedule() :
     # atcoderのコンテストスケジュールをまとめたサイトのhtmlを取得
-    res = requests.get('https://competitiveprogramming.info/atcoder/contests')
+    res = requests.get('https://atcoder.jp/home')
     res.raise_for_status()
     # 取得したhtmlをbs4で解析可能に
     soup = bs4.BeautifulSoup(res.content, "html.parser")
@@ -51,15 +51,19 @@ def get_atcoder_schedule() :
     elems = []
     group = soup.find_all("td")
     for g in group:
-        s = str(g.contents[0])
-        s = delete_brackets(s)
+        s = delete_brackets(str(g))
         elems.append(s)
+    
+    contests = []
+    for i in range(len(elems)):
+        try :
+            t = dt.strptime(elems[i], '%Y-%m-%d %H:%M:%S+0900')
+            contests.append(elems[i+1].replace("◉ ", ""))
+            contests.append(str(t))
+        except :
+            continue
 
-    for i in range((int(len(elems)/3))):
-        s = elems[3*i].replace(" ", "T")[0:19]
-        elems[3*i] = s
-
-    return elems
+    return contests
 
 
 def main(event):
@@ -100,31 +104,34 @@ if __name__ == '__main__':
         },
     }
 
-    elems = get_atcoder_schedule()
+    contest = get_atcoder_schedule()
+    
+    pre_saved = []
+    with open('data/schedule.txt', mode='rt') as f:
+        for d in f:
+            pre_saved.append(d.replace('\n', ''))
+    f.close()
 
-    for i in range(int(len(elems)/3)):
-        event['start']['dateTime'] = str(elems[3*i])
-        event['description'] = str(elems[3*i+1])
-        event['summary'] = str(elems[3*i+2])
+    ## 各コンテスト名毎にループ
+    for i in range(int(len(contest)/2)) :
+        ## 前回のスケジュール取得時に既にカレンダーに追加済みでなければ
+        if not(contest[2*i] in pre_saved) :
+            event['summary'] = contest[2*i]
+            event['start']['dateTime'] = contest[2*i+1].replace(" ", "T")
+            ## コンテストの終了時間を計算 : begin 
+            s = str(event['start']['dateTime']).replace("T", " ")
+            t = dt.strptime(s, '%Y-%m-%d %H:%M:%S')
+            if (t.hour==23) :
+                t = str(t + datetime.timedelta(days=1, hours=1)).replace(" ", "T")
+            else :
+                t = str(t + datetime.timedelta(hours=1)).replace(" ", "T")
+            event['end']['dateTime'] = t
+            ## コンテストの終了時間を計算 : finish
 
-        tmp_time = str(elems[3*i])
-        new_time = str(int(tmp_time[11:13])+1)[0:2]
-        end_time = list(elems[3*i])
+            print (event['start']['dateTime'], event['end']['dateTime'], event['summary'])
 
-        s = str(event['start']['dateTime']).replace("T", " ")
-        t = dt.strptime(s, '%Y-%m-%d %H:%M:%S')
-        
-        if (t.hour==23 or t.hour==0 or (t.hour==22 and t.minute>=30)) :
-            t = str(t + datetime.timedelta(days=1, hours=1, minutes=30)).replace(" ", "T")
-        else :
-            t = str(t + datetime.timedelta(hours=1, minutes=30)).replace(" ", "T")
+            with open('data/schedule.txt', mode='a') as f :
+                f.write(str(event['summary']))
+                f.write("\n")
 
-        event['end']['dateTime'] = t
-
-        print("AtCoder : ", i)
-        with open('data/test.json', mode='a') as f :
-            f.write(event['start']['dateTime'])
-            f.write("\n")
-        print("=========================")
-
-        main(event)
+            main(event)

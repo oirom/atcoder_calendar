@@ -1,102 +1,41 @@
-import requests, re, bs4, json, os, shutil, datetime
-from collections import OrderedDict
+import requests, re, bs4, json, os, shutil, datetime, urllib.request
+from bs4 import BeautifulSoup
 from datetime import datetime as dt
 
-def delete_brackets(s):
-    """
-    括弧と括弧内文字列を削除
-    """
-    """ brackets to zenkaku """
-    table = {
-        "(": "（",
-        ")": "）",
-        "<": "＜",
-        ">": "＞",
-        "{": "｛",
-        "}": "｝",
-        "[": "［",
-        "]": "］"
-    }
-    for key in table.keys():
-        s = s.replace(key, table[key])
-    """ delete zenkaku_brackets """
-    l = ['（[^（|^）]*）', '【[^【|^】]*】', '＜[^＜|^＞]*＞', '［[^［|^］]*］',
-            '「[^「|^」]*」', '｛[^｛|^｝]*｝', '〔[^〔|^〕]*〕', '〈[^〈|^〉]*〉']
-    for l_ in l:
-        s = re.sub(l_, "", s)
-    """ recursive processing """
-    return delete_brackets(s) if sum([1 if re.search(l_, s) else 0 for l_ in l]) > 0 else s
-
 def get_atcoder_schedule() :
-    # atcoderのコンテストスケジュールをまとめたサイトのhtmlを取得
-    res = requests.get('https://atcoder.jp/home')
+
+    url = 'https://atcoder.jp/home'
+    res = requests.get(url)
     res.raise_for_status()
-    # 取得したhtmlをbs4で解析可能に
     soup = bs4.BeautifulSoup(res.content, "html.parser")
-    # 特定のタグ<td>についてその要素を取得
-    #elems = soup.select("td")
-    
-    elems = []
-    group = soup.find_all("td")
-    for g in group:
-        s = delete_brackets(str(g))
-        elems.append(s)
-    
-    contests = []
-    for i in range(len(elems)):
-        try :
-            t = dt.strptime(elems[i], '%Y-%m-%d %H:%M:%S+0900')
-            contests.append(elems[i+1].replace("◉ ", ""))
-            contests.append(str(t))
-        except :
-            continue
-            
 
-    return contests
+    contest_date = []
+    contest_name = []
 
+    # <div id="contest-table-upcoming"> の内容を取得
+    for s in soup.find_all('div', id="contest-table-upcoming") :
+        # <time> の内容を取得してリストに格納
+        for t in s.find_all('time') :
+            contest_date.append(t.contents[0])
+        # <a href='/contests/~'> の内容を取得してリストに格納
+        for c in s.select('a[href^="/contests"]') :
+            contest_name.append(c.contents[0])
+
+    # <time> から取得した時刻を datetime モジュールで計算可能な形に処理
+    contest_date = list(map(lambda x : str(dt.strptime(x, '%Y-%m-%d %H:%M:%S+0900')), contest_date))
+
+    return contest_name, contest_date
 
 if __name__ == '__main__':
 
-    event = {
-        'summary': '',
-        'location': '',
-        'description': '',
-        'start': {
-            'dateTime': '2020-01-01T00:00:00',
-            'timeZone': 'Japan',
-        },
-        'end': {
-            'dateTime': '2020-01-01T01:00:00',
-            'timeZone': 'Japan',
-        },
-    }
-    
-    contest = get_atcoder_schedule()
-    
-    pre_saved = []
-    with open('data/schedule.txt', mode='rt') as f:
-        for d in f:
-            pre_saved.append(d.replace('\n', ''))
-    f.close()
+    name, start_date = get_atcoder_schedule()
 
-    ## 各コンテスト名毎にループ
-    for i in range(int(len(contest)/2)) :
-        ## 前回のスケジュール取得時に既にカレンダーに追加済みでなければ
-        if not(contest[2*i] in pre_saved) :
-            event['summary'] = contest[2*i]
-            event['start']['dateTime'] = contest[2*i+1].replace(" ", "T")
-            ## コンテストの終了時間を計算 : begin 
-            s = str(event['start']['dateTime']).replace("T", " ")
-            t = dt.strptime(s, '%Y-%m-%d %H:%M:%S')
-            if (t.hour==23) :
-                t = str(t + datetime.timedelta(days=1, hours=1)).replace(" ", "T")
-            else :
-                t = str(t + datetime.timedelta(hours=1)).replace(" ", "T")
-            event['end']['dateTime'] = t
-            ## コンテストの終了時間を計算 : finish
+    print (name)
+    print (start_date)
 
-            print (event['start']['dateTime'], event['end']['dateTime'], event['summary'])
+    # 取得した AtCoder の開始時刻から終了時刻を計算
+    end_date = list(map(lambda x : 
+        str(dt.strptime(x, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(days=1, hours=1)) if dt.strptime(x, '%Y-%m-%d %H:%M:%S').hour==23 
+        else str(dt.strptime(x, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(hours=1)), start_date))
 
-            with open('data/schedule.txt', mode='a') as f :
-                f.write(str(event['summary']))
-                f.write("\n")
+    print (end_date)
