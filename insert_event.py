@@ -3,6 +3,7 @@ import datetime
 import pickle
 import os, os.path
 import sys
+import urllib.parse as urlparse
 import requests, re, bs4
 from datetime import datetime as dt
 from googleapiclient.discovery import build
@@ -38,27 +39,28 @@ def get_atcoder_schedule() :
     duration_objs = contest_table.select('tbody tr > td:nth-child(3)')
 
     # コンテストの名前・開始時間・制限時間の数は同じ必要がある
-    if not (len(start_datetime_objs) == len(name_objs) and len(name_objs) == len(duration_objs)):
+    if not (len(name_objs) == len(start_datetime_objs) == len(duration_objs)):
         print("Failed to retrieve all the contests info.")
         sys.exit(1)
+    num_event = len(start_datetime_objs)
+    event_list = []
 
-    start_date = []
-    end_date = []
-    contest_name = list(map(lambda name_obj: name_obj.text, name_objs))
-
-    for i in range(len(start_datetime_objs)):
+    for i in range(num_event):
+        tmp_event = event
+        tmp_event['summary'] = name_objs[i].text
+        tmp_event['description'] = urlparse.urljoin('https://atcoder.jp', name_objs[i].attrs['href'])
         start_datetime = dt.strptime(start_datetime_objs[i].text, '%Y-%m-%d %H:%M:%S+0900')
-        start_date.append(start_datetime.strftime('%Y-%m-%dT%H:%M:%S'))
+        tmp_event['start']['dateTime'] = start_datetime.strftime('%Y-%m-%dT%H:%M:%S')
         duration_time = duration_objs[i].text.split(':')
         duration_timedelta = datetime.timedelta(hours=int(duration_time[0]), minutes=int(duration_time[1]))
         end_datetime = start_datetime + duration_timedelta
-        end_date.append(end_datetime.strftime('%Y-%m-%dT%H:%M:%S'))
-    return contest_name, start_date, end_date
+        tmp_event['end']['dateTime'] = end_datetime.strftime('%Y-%m-%dT%H:%M:%S')
+        event_list.append(tmp_event)
+    return event_list
 
 
 def main():
-    # コンテスト名，開始時刻，終了時刻をそれぞれリスト形式で取得
-    names, start_dates, end_dates = get_atcoder_schedule()
+    event_list = get_atcoder_schedule()
     
     # 既にカレンダーに追加しているコンテスト名を読みこむ
     scheduled = []
@@ -68,12 +70,7 @@ def main():
     f.close()
 
     # 取得した各コンテストについてループ
-    for name, start, end in zip(names, start_dates, end_dates) :
-        
-        event['summary'] = name
-        event['start']['dateTime'] = start
-        event['end']['dateTime'] = end
-        
+    for event in event_list:
         # 既にカレンダーに追加済みであればその旨を出力
         if event['summary'] in scheduled :
             print('already registered!')
