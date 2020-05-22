@@ -55,31 +55,8 @@ def get_atcoder_schedule() :
         end_date.append(end_datetime.strftime('%Y-%m-%dT%H:%M:%S'))
     return contest_name, start_date, end_date
 
-# google calender api を使う部分．サンプルそのまま
-def main(event):
-    creds = None
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
 
-    service = build('calendar', 'v3', credentials=creds)
-
-    event = service.events().insert(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com', body=event).execute()
-
-    print (event['id'])
-
-
-if __name__ == '__main__':
-
+def main():
     # コンテスト名，開始時刻，終了時刻をそれぞれリスト形式で取得
     names, start_dates, end_dates = get_atcoder_schedule()
     
@@ -103,8 +80,33 @@ if __name__ == '__main__':
         # まだカレンダーに追加していないコンテストであれば追加し，
         # 追加済みリストにコンテスト名を書き込む
         else :
-            main(event)
+            add_event(event)
             with open('data/schedule.txt', mode='a') as f :
                 f.write(str(event['summary']))
                 f.write("\n")
             f.close()
+
+# google calender api を使う部分．サンプルそのまま
+def add_event(event):
+    creds = None
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+
+    service = build('calendar', 'v3', credentials=creds)
+
+    event = service.events().insert(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com', body=event).execute()
+
+    print (event['id'])
+
+if __name__ == '__main__':
+    main()
