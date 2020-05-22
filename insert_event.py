@@ -49,9 +49,8 @@ def get_atcoder_schedule() :
     for i in range(len(start_datetime_objs)):
         start_datetime = dt.strptime(start_datetime_objs[i].text, '%Y-%m-%d %H:%M:%S+0900')
         start_date.append(start_datetime.strftime('%Y-%m-%dT%H:%M:%S'))
-        # 制限時間を(datetime→)timedeltaに変換して開始時間と足す
-        tmp_dt = dt.strptime(duration_objs[i].text, '%H:%M')
-        duration_timedelta = datetime.timedelta(hours=tmp_dt.hour, minutes=tmp_dt.minute)
+        duration_time = duration_objs[i].text.split(':')
+        duration_timedelta = datetime.timedelta(hours=int(duration_time[0]), minutes=int(duration_time[1]))
         end_datetime = start_datetime + duration_timedelta
         end_date.append(end_datetime.strftime('%Y-%m-%dT%H:%M:%S'))
     return contest_name, start_date, end_date
