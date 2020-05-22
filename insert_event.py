@@ -26,38 +26,34 @@ event = {
 }
 
 def get_atcoder_schedule() :
-
-    url = 'https://atcoder.jp/home'
+    url = 'https://atcoder.jp/contests'
     res = requests.get(url)
     res.raise_for_status()
-    soup = bs4.BeautifulSoup(res.content, "html.parser")
+    soup = bs4.BeautifulSoup(res.content, 'html.parser')
+
+    # 今後開催されるコンテストのテーブルから、開始時間・コンテスト名・制限時間を取得
+    contest_table = soup.find('div', id='contest-table-upcoming').find('table')
+    start_datetime_objs = contest_table.select('tbody tr > td:nth-child(1)')
+    name_objs = contest_table.select('tbody tr > td:nth-child(2) > a')
+    duration_objs = contest_table.select('tbody tr > td:nth-child(3)')
+
+    # コンテストの名前・開始時間・制限時間の数は同じ必要がある
+    if not (len(start_datetime_objs) == len(name_objs) and len(name_objs) == len(duration_objs)):
+        print("Failed to retrieve all the contests info.")
+        sys.exit(1)
 
     start_date = []
     end_date = []
-    contest_name = []
+    contest_name = list(map(lambda name_obj: name_obj.text, name_objs)) # コンテスト名の先頭についている不要な文字列を削除
 
-    # <div id="contest-table-upcoming"> の内容を取得
-    for s in soup.find_all('div', id="contest-table-upcoming") :
-        # <time> の内容を取得してリストに格納
-        for t in s.find_all('time') :
-            start_date.append(t.contents[0])
-        # <a href='/contests/~'> の内容を取得してリストに格納
-        for c in s.select('a[href^="/contests"]') :
-            contest_name.append(c.contents[0])
-
-    # <time> から取得した時刻を datetime モジュールで計算可能な形に処理
-    start_date = list(map(lambda x : str(dt.strptime(x, '%Y-%m-%d %H:%M:%S+0900')), start_date))
-
-    # 取得した AtCoder の開始時刻をもとに終了時刻を計算
-    # 計算の際には日付の変更などに気を付ける必要あり
-    end_date = list(map(lambda x : 
-        str(dt.strptime(x, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(days=1, hours=1)) if dt.strptime(x, '%Y-%m-%d %H:%M:%S').hour==23 
-        else str(dt.strptime(x, '%Y-%m-%d %H:%M:%S') + datetime.timedelta(hours=1)), start_date))
-    
-    # 日時データを google calender api で利用可能な形に整形（日付と時刻の間に T を入れるだけ）
-    start_date = list(map(lambda x : x.replace(" ", "T"), start_date))
-    end_date = list(map(lambda x : x.replace(" ", "T"), end_date))
-
+    for i in range(len(start_datetime_objs)):
+        start_datetime = dt.strptime(start_datetime_objs[i].text, '%Y-%m-%d %H:%M:%S+0900')
+        start_date.append(start_datetime.strftime('%Y-%m-%dT%H:%M:%S'))
+        # 制限時間を(datetime→)timedeltaに変換して開始時間と足す
+        tmp_dt = dt.strptime(duration_objs[i].text, '%H:%M')
+        duration_timedelta = datetime.timedelta(hours=tmp_dt.hour, minutes=tmp_dt.minute)
+        end_datetime = start_datetime + duration_timedelta
+        end_date.append(end_datetime.strftime('%Y-%m-%dT%H:%M:%S'))
     return contest_name, start_date, end_date
 
 # google calender api を使う部分．サンプルそのまま
