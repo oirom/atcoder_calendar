@@ -2,6 +2,7 @@ from __future__ import print_function
 import datetime
 import pickle
 import os, os.path
+import sys
 import requests, re, bs4
 from datetime import datetime as dt
 from googleapiclient.discovery import build
@@ -31,7 +32,6 @@ def get_atcoder_schedule() :
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.content, 'html.parser')
 
-    # 今後開催されるコンテストのテーブルから、開始時間・コンテスト名・制限時間を取得
     contest_table = soup.find('div', id='contest-table-upcoming').find('table')
     start_datetime_objs = contest_table.select('tbody tr > td:nth-child(1)')
     name_objs = contest_table.select('tbody tr > td:nth-child(2) > a')
@@ -44,7 +44,7 @@ def get_atcoder_schedule() :
 
     start_date = []
     end_date = []
-    contest_name = list(map(lambda name_obj: name_obj.text, name_objs)) # コンテスト名の先頭についている不要な文字列を削除
+    contest_name = list(map(lambda name_obj: name_obj.text, name_objs))
 
     for i in range(len(start_datetime_objs)):
         start_datetime = dt.strptime(start_datetime_objs[i].text, '%Y-%m-%d %H:%M:%S+0900')
