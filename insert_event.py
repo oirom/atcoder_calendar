@@ -1,10 +1,11 @@
 from __future__ import print_function
-import datetime
-import pickle
-import os, os.path
 import sys
-import urllib.parse as urlparse
+import copy
+import pickle
+import datetime
+import os, os.path
 import requests, re, bs4
+import urllib.parse as urlparse
 from datetime import datetime as dt
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -55,13 +56,13 @@ def get_atcoder_schedule() :
         duration_timedelta = datetime.timedelta(hours=int(duration_time[0]), minutes=int(duration_time[1]))
         end_datetime = start_datetime + duration_timedelta
         tmp_event['end']['dateTime'] = end_datetime.strftime('%Y-%m-%dT%H:%M:%S')
-        event_list.append(tmp_event)
+        event_list.append(copy.deepcopy(tmp_event))
     return event_list
 
 
 def main():
     event_list = get_atcoder_schedule()
-    
+
     # 既にカレンダーに追加しているコンテスト名を読みこむ
     scheduled = []
     with open('data/schedule.txt', mode='rt') as f:
