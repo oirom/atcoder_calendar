@@ -1,4 +1,4 @@
-from __future__ import print_function
+#from __future__ import print_function
 import sys
 import copy
 import pickle
@@ -11,24 +11,21 @@ from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 
-# If modifying these scopes, delete the file token.pickle.
-SCOPES = ['https://www.googleapis.com/auth/calendar']
-
-event = {
-    'summary': '',
-    'location': '',
-    'description': '',
-    'start': {
-        'dateTime': '2020-01-01T00:00:00',
-        'timeZone': 'Japan',
-    },
-    'end': {
-        'dateTime': '2020-01-01T01:00:00',
-        'timeZone': 'Japan',
-    },
-}
-
 def get_atcoder_schedule() :
+    event = {
+        'summary': '',
+        'location': '',
+        'description': '',
+        'start': {
+            'dateTime': '2020-01-01T00:00:00',
+            'timeZone': 'Japan',
+        },
+        'end': {
+            'dateTime': '2020-01-01T01:00:00',
+            'timeZone': 'Japan',
+        },
+    }
+    
     url = 'https://atcoder.jp/contests'
     res = requests.get(url)
     res.raise_for_status()
@@ -61,6 +58,7 @@ def get_atcoder_schedule() :
 
 # google calender api を使う部分．サンプルそのまま
 def add_event(event):
+    SCOPES = ['https://www.googleapis.com/auth/calendar']
     creds = None
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
@@ -71,6 +69,7 @@ def add_event(event):
         else:
             flow = InstalledAppFlow.from_client_secrets_file(
                 'credentials.json', SCOPES)
+            print(flow)
             creds = flow.run_local_server(port=0)
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
@@ -82,6 +81,7 @@ def add_event(event):
     print (event['id'])
 
 def get_registered_event():
+    SCOPES = ['https://www.googleapis.com/auth/calendar']
     creds = None
 
     if os.path.exists('token.pickle'):
@@ -128,10 +128,6 @@ def main():
         # 追加済みリストにコンテスト名を書き込む
         else :
             add_event(event)
-            with open('data/schedule.txt', mode='a') as f :
-                f.write(str(event['summary']))
-                f.write("\n")
-            f.close()
 
 if __name__ == '__main__':
     main()
