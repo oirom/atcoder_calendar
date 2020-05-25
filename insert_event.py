@@ -4,7 +4,7 @@ import copy
 import pickle
 import datetime
 import os, os.path
-import requests, re, bs4
+import requests, bs4
 import urllib.parse as urlparse
 from datetime import datetime as dt
 from googleapiclient.discovery import build
@@ -59,31 +59,6 @@ def get_atcoder_schedule() :
         event_list.append(copy.deepcopy(tmp_event))
     return event_list
 
-
-def main():
-    event_list = get_atcoder_schedule()
-
-    # 既にカレンダーに追加しているコンテスト名を読みこむ
-    scheduled = []
-    with open('data/schedule.txt', mode='rt') as f:
-        for d in f:
-            scheduled.append(d.replace('\n', ''))
-    f.close()
-
-    # 取得した各コンテストについてループ
-    for event in event_list:
-        # 既にカレンダーに追加済みであればその旨を出力
-        if event['summary'] in scheduled :
-            print('already registered!')
-        # まだカレンダーに追加していないコンテストであれば追加し，
-        # 追加済みリストにコンテスト名を書き込む
-        else :
-            add_event(event)
-            with open('data/schedule.txt', mode='a') as f :
-                f.write(str(event['summary']))
-                f.write("\n")
-            f.close()
-
 # google calender api を使う部分．サンプルそのまま
 def add_event(event):
     creds = None
@@ -105,6 +80,58 @@ def add_event(event):
     event = service.events().insert(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com', body=event).execute()
 
     print (event['id'])
+
+def get_registered_event():
+    creds = None
+
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        with open('token.pickle', 'wb') as token:
+            pickle.dump(creds, token)
+
+    service = build('calendar', 'v3', credentials=creds)
+
+    # Call the Calendar API
+    dt = datetime.date.today()
+    timefrom = dt.strftime('%Y/%m/%d')
+    timeto = (dt + datetime.timedelta(weeks=8)).strftime('%Y/%m/%d')
+    timefrom = datetime.datetime.strptime(timefrom, '%Y/%m/%d').isoformat()+'Z'
+    timeto = datetime.datetime.strptime(timeto, '%Y/%m/%d').isoformat()+'Z'
+    events_result = service.events().list(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com',timeMin=timefrom,timeMax=timeto,singleEvents=True,orderBy='startTime').execute()
+    events = events_result.get('items', [])
+
+    registered_event = []
+
+    for event in events:
+        registered_event.append(event['summary'])
+    return registered_event
+
+
+def main():
+    event_list = get_atcoder_schedule()
+    reged_list = get_registered_event()
+
+    # 取得した各コンテストについてループ
+    for event in event_list:
+        # 既にカレンダーに追加済みであればその旨を出力
+        if event['summary'] in reged_list :
+            print('already registered!')
+        # まだカレンダーに追加していないコンテストであれば追加し，
+        # 追加済みリストにコンテスト名を書き込む
+        else :
+            add_event(event)
+            with open('data/schedule.txt', mode='a') as f :
+                f.write(str(event['summary']))
+                f.write("\n")
+            f.close()
 
 if __name__ == '__main__':
     main()
