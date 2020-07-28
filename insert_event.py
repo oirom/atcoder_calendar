@@ -1,5 +1,6 @@
 #from __future__ import print_function
 import sys
+import json
 import copy
 import pickle
 import datetime
@@ -10,6 +11,8 @@ from datetime import datetime as dt
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+
+dev_key = ""
 
 def get_atcoder_schedule() :
     event = {
@@ -31,7 +34,11 @@ def get_atcoder_schedule() :
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.content, 'html.parser')
 
-    contest_table = soup.find('div', id='contest-table-upcoming').find('table')
+    try:
+        contest_table = soup.find('div', id='contest-table-upcoming').find('table')
+    except:
+        # print("no upcoming contests")
+        return 0
     start_datetime_objs = contest_table.select('tbody tr > td:nth-child(1)')
     name_objs = contest_table.select('tbody tr > td:nth-child(2) > a')
     duration_objs = contest_table.select('tbody tr > td:nth-child(3)')
@@ -58,8 +65,10 @@ def get_atcoder_schedule() :
 
 # google calender api を使う部分．サンプルそのまま
 def add_event(event):
+    '''
     SCOPES = ['https://www.googleapis.com/auth/calendar']
     creds = None
+    
     if os.path.exists('token.pickle'):
         with open('token.pickle', 'rb') as token:
             creds = pickle.load(token)
@@ -73,14 +82,16 @@ def add_event(event):
             creds = flow.run_local_server(port=0)
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
-
-    service = build('calendar', 'v3', credentials=creds)
+    '''
+    # service = build('calendar', 'v3', credentials=creds)
+    service = build('calendar', 'v3', developerKey=dev_key)
 
     event = service.events().insert(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com', body=event).execute()
 
     print (event['id'])
 
 def get_registered_event():
+    '''
     SCOPES = ['https://www.googleapis.com/auth/calendar']
     creds = None
 
@@ -96,8 +107,9 @@ def get_registered_event():
             creds = flow.run_local_server(port=0)
         with open('token.pickle', 'wb') as token:
             pickle.dump(creds, token)
-
-    service = build('calendar', 'v3', credentials=creds)
+    '''
+    #service = build('calendar', 'v3', credentials=creds)
+    service = build('calendar', 'v3', developerKey=dev_key)
 
     # Call the Calendar API
     dt = datetime.date.today()
@@ -116,18 +128,23 @@ def get_registered_event():
 
 
 def main():
+
     event_list = get_atcoder_schedule()
     reged_list = get_registered_event()
 
     # 取得した各コンテストについてループ
-    for event in event_list:
-        # 既にカレンダーに追加済みであればその旨を出力
-        if event['summary'] in reged_list :
-            print('already registered!')
-        # まだカレンダーに追加していないコンテストであれば追加し，
-        # 追加済みリストにコンテスト名を書き込む
-        else :
-            add_event(event)
+    try:
+        for event in event_list:
+            # 既にカレンダーに追加済みであればその旨を出力
+            if event['summary'] in reged_list :
+                print('already registered!')
+            # まだカレンダーに追加していないコンテストであれば追加し，
+            # 追加済みリストにコンテスト名を書き込む
+            else :
+                add_event(event)
+    except:
+        print("NOTHING NEW UPCOMING CONTESTS")
+
 
 if __name__ == '__main__':
     main()
