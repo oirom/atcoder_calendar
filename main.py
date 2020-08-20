@@ -7,6 +7,7 @@ import os, os.path
 import requests, bs4
 import urllib.parse as urlparse
 from datetime import datetime as dt
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -60,43 +61,15 @@ def get_atcoder_schedule() :
 def add_event(event):
     SCOPES = ['https://www.googleapis.com/auth/calendar']
     creds = None
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            print(flow)
-            creds = flow.run_local_server(port=0)
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-
+    creds = service_account.Credentials.from_service_account_file("./ServiceAccount.json", scopes=SCOPES)
     service = build('calendar', 'v3', credentials=creds)
-
     event = service.events().insert(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com', body=event).execute()
-
     print (event['id'])
 
 def get_registered_event():
     SCOPES = ['https://www.googleapis.com/auth/calendar']
     creds = None
-
-    if os.path.exists('token.pickle'):
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                'credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
-        with open('token.pickle', 'wb') as token:
-            pickle.dump(creds, token)
-
+    creds = service_account.Credentials.from_service_account_file("./ServiceAccount.json", scopes=SCOPES)
     service = build('calendar', 'v3', credentials=creds)
 
     # Call the Calendar API
@@ -117,7 +90,9 @@ def get_registered_event():
 
 def main():
     event_list = get_atcoder_schedule()
+    print(event_list)
     reged_list = get_registered_event()
+    print(reged_list)
 
     # 取得した各コンテストについてループ
     try:
