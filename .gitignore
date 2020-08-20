@@ -1,3 +1,6 @@
+ignore_dir
 credentials.json
+test.py
 token.pickle
 tokens.txt
+QuickstartSAK.json
