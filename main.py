@@ -15,8 +15,9 @@ from google.auth.transport.requests import Request
 
 SCOPES: Final[List[str]] = ['https://www.googleapis.com/auth/calendar']
 API_CRED_FILE_PATH: Final[str] = "./ServiceAccount.json"
-API_CREDENTIAL:Final[Any] = service_account.Credentials.from_service_account_file(API_CRED_FILE_PATH, scopes=SCOPES)
-API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL)
+API_CREDENTIAL: Final[Any] = service_account.Credentials.from_service_account_file(API_CRED_FILE_PATH, scopes=SCOPES)
+API_SERVICE: Final[Any] = build('calendar', 'v3', credentials=API_CREDENTIAL)
+CALENDAR_ID: Final[Any] = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
 
 def get_atcoder_schedule() :
     EVENT_TEMPLATE: Final[dict[str, str]] = {
@@ -65,7 +66,7 @@ def get_atcoder_schedule() :
 
 # google calender api を使う部分．サンプルそのまま
 def add_event(event):
-    event = API_SERVICE.events().insert(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com', body=event).execute()
+    event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event).execute()
     print (event['id'])
 
 def get_registered_event():
@@ -75,7 +76,7 @@ def get_registered_event():
     timeto = (dt + datetime.timedelta(weeks=8)).strftime('%Y/%m/%d')
     timefrom = datetime.datetime.strptime(timefrom, '%Y/%m/%d').isoformat()+'Z'
     timeto = datetime.datetime.strptime(timeto, '%Y/%m/%d').isoformat()+'Z'
-    events_result = API_SERVICE.events().list(calendarId='s1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com',timeMin=timefrom,timeMax=timeto,singleEvents=True,orderBy='startTime').execute()
+    events_result = API_SERVICE.events().list(calendarId=CALENDAR_ID, timeMin=timefrom,timeMax=timeto,singleEvents=True,orderBy='startTime').execute()
     events = events_result.get('items', [])
     return [event['summary'] for event in events]
 
