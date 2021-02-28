@@ -112,16 +112,6 @@ def delete_contests(time_from, time_to):
         timeMax=f"{time_to.isoformat()}Z",
     ).delete().execute()
 
-def get_registered_event(time_from, time_to):
-    # Call the Calendar API
-    events_result = API_SERVICE.events().list(
-        calendarId=CALENDAR_ID,
-        timeMin=f"{time_from.isoformat()}Z",
-        timeMax=f"{time_to.isoformat()}Z",
-    ).execute()
-    events = events_result.get('items', [])
-    return [event['summary'] for event in events]
-
 def main():
     event_list = get_atcoder_schedule()
     print(event_list)
