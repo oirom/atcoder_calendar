@@ -5,7 +5,7 @@ import datetime
 import requests, bs4
 import urllib.parse as urlparse
 from datetime import datetime as dt
-from typing import Final, List, Any, Dict
+from typing import Final, List, Any
 from dataclasses import dataclass
 
 
