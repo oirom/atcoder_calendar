@@ -5,7 +5,8 @@ import datetime
 import requests, bs4
 import urllib.parse as urlparse
 from datetime import datetime as dt
-from typing import Final, List, Any
+from typing import Final, List, Any, Dict
+from dataclasses import dataclass
 
 
 from google.oauth2 import service_account
@@ -18,24 +19,67 @@ API_CRED_FILE_PATH: Final[str] = "./ServiceAccount.json"
 API_CREDENTIAL: Final[Any] = service_account.Credentials.from_service_account_file(API_CRED_FILE_PATH, scopes=SCOPES)
 API_SERVICE: Final[Any] = build('calendar', 'v3', credentials=API_CREDENTIAL)
 CALENDAR_ID: Final[Any] = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
+ATCODER_BASE_URL: Final[str] = 'https://atcoder.jp/'
+
+@dataclass
+class TimeWithStrTimeZone:
+    time: datetime.datetime
+    time_zone: str = 'Japan'
+
+    def get_as_obj(self):
+        self.time.tzinfo = None
+        return {
+            'dateTime': self.time.isoformat(timespec='seconds'),
+            'timeZone': self.time_zone
+        }
+
+@dataclass
+class AtCoderContest:
+    summary: str
+    start: TimeWithStrTimeZone
+    end: TimeWithStrTimeZone
+    location: str = ''
+    description: str = ''
+    
+    def get_as_obj(self):
+        '''
+        以下のような形で返す
+        {
+            'summary': 'ABC001',
+            'location': '',
+            'description': 'https://atcoder.jp/contests/abc001',
+            'start': {
+                'dateTime': '2020-01-01T00:00:00',
+                'timeZone': 'Japan',
+            },
+            'end': {
+                'dateTime': '2020-01-01T01:00:00',
+                'timeZone': 'Japan',
+            }
+        }
+        '''
+        return {
+            'summary': self.summary,
+            'location': self.location,
+            'description': self.description,
+            'start': self.start.get_as_obj(),
+            'end': self.end.get_as_obj()
+        }
+
+
+def parse_event(name_obj, start_datetime_obj, duration_obj):
+    summary = name_obj.text
+    description = urlparse.urljoin(ATCODER_BASE_URL, name_obj.attrs['href'])
+    start_datetime = dt.strptime(start_datetime_obj.text, '%Y-%m-%d %H:%M:%S+0900')
+    duration_time = duration_obj.text.split(':')
+    duration_timedelta = datetime.timedelta(hours=int(duration_time[0]), minutes=int(duration_time[1]))
+    end_datetime = start_datetime + duration_timedelta
+    return AtCoderContest(
+        summary=summary, start=TimeWithStrTimeZone(start_datetime), end=TimeWithStrTimeZone(end_datetime), description=description
+    ).get_as_obj()
 
 def get_atcoder_schedule() :
-    EVENT_TEMPLATE: Final[dict[str, str]] = {
-        'summary': '',
-        'location': '',
-        'description': '',
-        'start': {
-            'dateTime': '2020-01-01T00:00:00',
-            'timeZone': 'Japan',
-        },
-        'end': {
-            'dateTime': '2020-01-01T01:00:00',
-            'timeZone': 'Japan',
-        },
-    }
-    
-    url: Final[str] = 'https://atcoder.jp/'
-    res = requests.get(urlparse.join(url, "contests"))
+    res = requests.get(urlparse.join(ATCODER_BASE_URL, "contests"))
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.content, 'html.parser')
 
@@ -48,20 +92,12 @@ def get_atcoder_schedule() :
     if not (len(name_objs) == len(start_datetime_objs) == len(duration_objs)):
         print("Failed to retrieve all the contests info.")
         sys.exit(1)
-    num_event = len(start_datetime_objs)
-    event_list = []
 
-    for i in range(num_event):
-        tmp_event = copy.deepcopy(EVENT_TEMPLATE)
-        tmp_event['summary'] = name_objs[i].text
-        tmp_event['description'] = urlparse.urljoin(url, name_objs[i].attrs['href'])
-        start_datetime = dt.strptime(start_datetime_objs[i].text, '%Y-%m-%d %H:%M:%S+0900')
-        tmp_event['start']['dateTime'] = start_datetime.strftime('%Y-%m-%dT%H:%M:%S')
-        duration_time = duration_objs[i].text.split(':')
-        duration_timedelta = datetime.timedelta(hours=int(duration_time[0]), minutes=int(duration_time[1]))
-        end_datetime = start_datetime + duration_timedelta
-        tmp_event['end']['dateTime'] = end_datetime.strftime('%Y-%m-%dT%H:%M:%S')
-        event_list.append(tmp_event)
+    event_list = [
+        parse_event(name_obj, start_datetime_obj, duration_obj)
+        for name_obj, start_datetime_obj, duration_obj in zip(name_objs, start_datetime_objs, duration_objs)
+    ]
+
     return event_list
 
 # google calender api を使う部分．サンプルそのまま
@@ -69,22 +105,29 @@ def add_event(event):
     event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event).execute()
     print (event['id'])
 
-def get_registered_event():
+def delete_contests(time_from, time_to):
+    API_SERVICE.events().list(
+        calendarId=CALENDAR_ID,
+        timeMin=f"{time_from.isoformat()}Z",
+        timeMax=f"{time_to.isoformat()}Z",
+    ).delete().execute()
+
+def get_registered_event(time_from, time_to):
     # Call the Calendar API
-    dt = datetime.date.today()
-    timefrom = dt.strftime('%Y/%m/%d')
-    timeto = (dt + datetime.timedelta(weeks=8)).strftime('%Y/%m/%d')
-    timefrom = datetime.datetime.strptime(timefrom, '%Y/%m/%d').isoformat()+'Z'
-    timeto = datetime.datetime.strptime(timeto, '%Y/%m/%d').isoformat()+'Z'
-    events_result = API_SERVICE.events().list(calendarId=CALENDAR_ID, timeMin=timefrom,timeMax=timeto,singleEvents=True,orderBy='startTime').execute()
+    events_result = API_SERVICE.events().list(
+        calendarId=CALENDAR_ID,
+        timeMin=f"{time_from.isoformat()}Z",
+        timeMax=f"{time_to.isoformat()}Z",
+    ).execute()
     events = events_result.get('items', [])
     return [event['summary'] for event in events]
 
 def main():
     event_list = get_atcoder_schedule()
     print(event_list)
-    reged_list = get_registered_event()
-    print(reged_list)
+    now = datetime.datetime.utcnow()
+    eight_week_later = now + datetime.timedelta(weeks=8)
+    delete_contests(time_from=now, time_to=eight_week_later)
 
     # 取得した各コンテストについてループ
     if not event_list:
@@ -92,12 +135,7 @@ def main():
         sys.exit()
 
     for event in event_list:
-        # 既にカレンダーに追加済みであればその旨を出力
-        if event['summary'] in reged_list :
-            print('already registered!')
-            continue
-        # まだカレンダーに追加していないコンテストであれば追加し，
-        # 追加済みリストにコンテスト名を書き込む
+        # TODO: eight_week_later以降のコンテストがあったらスキップ
         add_event(event)
 
 if __name__ == '__main__':
