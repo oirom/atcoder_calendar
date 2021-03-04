@@ -8,11 +8,12 @@ from datetime import datetime as dt
 from typing import Final, List, Any
 from dataclasses import dataclass
 
-
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+
+from modules.calendar_event import CalendarEvent
 
 SCOPES: Final[List[str]] = ['https://www.googleapis.com/auth/calendar']
 API_CRED_FILE_PATH: Final[str] = "./ServiceAccount.json"
@@ -21,61 +22,17 @@ API_SERVICE: Final[Any] = build('calendar', 'v3', credentials=API_CREDENTIAL)
 CALENDAR_ID: Final[Any] = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
 ATCODER_BASE_URL: Final[str] = 'https://atcoder.jp/'
 
-@dataclass
-class TimeWithStrTimeZone:
-    time: datetime.datetime
-    time_zone: str = 'Japan'
-
-    def get_as_obj(self):
-        self.time.tzinfo = None
-        return {
-            'dateTime': self.time.isoformat(timespec='seconds'),
-            'timeZone': self.time_zone
-        }
-
-@dataclass
-class AtCoderContest:
-    summary: str
-    start: TimeWithStrTimeZone
-    end: TimeWithStrTimeZone
-    location: str = ''
-    description: str = ''
-    
-    def get_as_obj(self):
-        '''
-        以下のような形で返す
-        {
-            'summary': 'ABC001',
-            'location': '',
-            'description': 'https://atcoder.jp/contests/abc001',
-            'start': {
-                'dateTime': '2020-01-01T00:00:00',
-                'timeZone': 'Japan',
-            },
-            'end': {
-                'dateTime': '2020-01-01T01:00:00',
-                'timeZone': 'Japan',
-            }
-        }
-        '''
-        return {
-            'summary': self.summary,
-            'location': self.location,
-            'description': self.description,
-            'start': self.start.get_as_obj(),
-            'end': self.end.get_as_obj()
-        }
 
 
 def parse_event(name_obj, start_datetime_obj, duration_obj):
-    summary = name_obj.text
-    description = urlparse.urljoin(ATCODER_BASE_URL, name_obj.attrs['href'])
-    start_datetime = dt.strptime(start_datetime_obj.text, '%Y-%m-%d %H:%M:%S+0900')
+    contest_title = name_obj.text
+    contest_url = urlparse.urljoin(ATCODER_BASE_URL, name_obj.attrs['href'])
+    start_at = dt.strptime(start_datetime_obj.text, '%Y-%m-%d %H:%M:%S+0900')
     duration_time = duration_obj.text.split(':')
     duration_timedelta = datetime.timedelta(hours=int(duration_time[0]), minutes=int(duration_time[1]))
-    end_datetime = start_datetime + duration_timedelta
-    return AtCoderContest(
-        summary=summary, start=TimeWithStrTimeZone(start_datetime), end=TimeWithStrTimeZone(end_datetime), description=description
+    end_at = start_at + duration_timedelta
+    return CalendarEvent(
+        summary=contest_title, start=start_at, end=end_at, description=contest_url
     ).get_as_obj()
 
 def get_atcoder_schedule() :
