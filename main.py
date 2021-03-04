@@ -18,7 +18,7 @@ API_SERVICE: Final[Any] = build('calendar', 'v3', credentials=API_CREDENTIAL)
 CALENDAR_ID: Final[Any] = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
 ATCODER_BASE_URL: Final[str] = 'https://atcoder.jp/'
 
-def parse_event(name_obj, start_datetime_obj, duration_obj):
+def parse_event(name_obj, start_datetime_obj, duration_obj) -> CalendarEvent:
     contest_title = name_obj.text
     contest_url = urlparse.urljoin(ATCODER_BASE_URL, name_obj.attrs['href'])
     start_at = dt.strptime(start_datetime_obj.text, '%Y-%m-%d %H:%M:%S+0900')
@@ -27,9 +27,9 @@ def parse_event(name_obj, start_datetime_obj, duration_obj):
     end_at = start_at + duration_timedelta
     return CalendarEvent(
         summary=contest_title, start_at=start_at, end_at=end_at, description=contest_url
-    ).get_as_obj()
+    )
 
-def get_atcoder_schedule() :
+def get_atcoder_schedule() -> List[CalendarEvent]:
     res = requests.get(urlparse.urljoin(ATCODER_BASE_URL, "contests"))
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.content, 'html.parser')
@@ -52,9 +52,9 @@ def get_atcoder_schedule() :
     return event_list
 
 # google calender api を使う部分．サンプルそのまま
-def add_event(event):
-    event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event).execute()
-    print (event['id'])
+def add_event(event: CalendarEvent):
+    added_event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
+    print (added_event['id'])
 
 def delete_contests(time_from, time_to):
     API_SERVICE.events().list(
@@ -76,7 +76,8 @@ def main():
         sys.exit()
 
     for event in event_list:
-        # TODO: eight_week_later以降のコンテストがあったらスキップ
+        if event.start_at > eight_week_later:
+            continue
         add_event(event)
 
 if __name__ == '__main__':
