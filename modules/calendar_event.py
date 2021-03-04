@@ -7,7 +7,6 @@ class TimeWithStrTimeZone:
     time_zone: str = 'Japan'
 
     def get_as_obj(self):
-        self.time.tzinfo = None
         return {
             'dateTime': self.time.isoformat(timespec='seconds'),
             'timeZone': self.time_zone

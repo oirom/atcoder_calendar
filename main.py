@@ -32,11 +32,11 @@ def parse_event(name_obj, start_datetime_obj, duration_obj):
     duration_timedelta = datetime.timedelta(hours=int(duration_time[0]), minutes=int(duration_time[1]))
     end_at = start_at + duration_timedelta
     return CalendarEvent(
-        summary=contest_title, start=start_at, end=end_at, description=contest_url
+        summary=contest_title, start_at=start_at, end_at=end_at, description=contest_url
     ).get_as_obj()
 
 def get_atcoder_schedule() :
-    res = requests.get(urlparse.join(ATCODER_BASE_URL, "contests"))
+    res = requests.get(urlparse.urljoin(ATCODER_BASE_URL, "contests"))
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.content, 'html.parser')
 
