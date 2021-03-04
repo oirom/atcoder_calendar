@@ -22,9 +22,9 @@ def parse_event(name_obj, start_datetime_obj, duration_obj) -> CalendarEvent:
     contest_title = name_obj.text
     contest_url = urlparse.urljoin(ATCODER_BASE_URL, name_obj.attrs['href'])
     start_at = dt.strptime(start_datetime_obj.text, '%Y-%m-%d %H:%M:%S+0900')
-    duration_time = duration_obj.text.split(':')
-    duration_timedelta = datetime.timedelta(hours=int(duration_time[0]), minutes=int(duration_time[1]))
-    end_at = start_at + duration_timedelta
+    contest_hours, contest_minutes = map(int, duration_obj.text.split(':'))
+    contest_duration = datetime.timedelta(hours=contest_hours, minutes=contest_minutes)
+    end_at = start_at + contest_duration
     return CalendarEvent(
         summary=contest_title, start_at=start_at, end_at=end_at, description=contest_url
     )
