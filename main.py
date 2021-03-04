@@ -1,17 +1,13 @@
 #from __future__ import print_function
 import sys
-import copy
 import datetime
 import requests, bs4
 import urllib.parse as urlparse
 from datetime import datetime as dt
 from typing import Final, List, Any
-from dataclasses import dataclass
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
 
 from modules.calendar_event import CalendarEvent
 
@@ -21,8 +17,6 @@ API_CREDENTIAL: Final[Any] = service_account.Credentials.from_service_account_fi
 API_SERVICE: Final[Any] = build('calendar', 'v3', credentials=API_CREDENTIAL)
 CALENDAR_ID: Final[Any] = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
 ATCODER_BASE_URL: Final[str] = 'https://atcoder.jp/'
-
-
 
 def parse_event(name_obj, start_datetime_obj, duration_obj):
     contest_title = name_obj.text
