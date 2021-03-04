@@ -72,7 +72,7 @@ def main():
 
     # 取得した各コンテストについてループ
     if not event_list:
-        print("There is no unregistered upcoming contests.")
+        print("There is no upcoming contests.")
         sys.exit()
 
     for event in event_list:
