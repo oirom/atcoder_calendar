@@ -64,8 +64,14 @@ class CalendarEvent:
 
 
 SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
-CREDENTIAL_JSON: Dict[str, str] = json.load(os.environ.get('CREDENTIAL_JSON'))
-API_CREDENTIAL = service_account.Credentials.from_service_account_file(CREDENTIAL_JSON, scopes=SCOPES)
+
+CREDENTIAL_JSON = json.loads(os.environ.get('CREDENTIAL_JSON'))
+
+# ローカルテスト用
+# with open('tmp.json') as f:
+#     CREDENTIAL_JSON = json.load(f)
+
+API_CREDENTIAL = service_account.Credentials.from_service_account_info(CREDENTIAL_JSON, scopes=SCOPES)
 API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL)
 CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
 ATCODER_BASE_URL: str = 'https://atcoder.jp/'
@@ -107,21 +113,26 @@ def get_atcoder_schedule() -> List[CalendarEvent]:
 def add_event(event: CalendarEvent, created_at: datetime.datetime):
     if event.description:
         event.description += '\n'
-    event.description += f'UPDATED AT: {created_at.isoformat()}'
-    print(event.description)
+    # HACK: UTC to JST
+    event.description += f"UPDATED AT: {(created_at + datetime.timedelta(hours=9)).strftime('%Y/%m/%d %H:%M:%S')} JST"
     added_event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
     print (added_event['id'])
 
 def delete_contests(time_from, time_to):
-    API_SERVICE.events().list(
+    events_to_delete =  API_SERVICE.events().list(
         calendarId=CALENDAR_ID,
         timeMin=f"{time_from.isoformat()}Z",
         timeMax=f"{time_to.isoformat()}Z",
-    ).delete().execute()
+    ).execute()['items']
+    for event in events_to_delete:
+        API_SERVICE.events().delete(
+            calendarId=CALENDAR_ID,
+            eventId=event['id']
+        ).execute()
 
 def main():
     event_list = get_atcoder_schedule()
-    print(event_list)
+    print(f"{len(event_list)} contests have been retrieved.")
     now = datetime.datetime.utcnow()
     eight_week_later = now + datetime.timedelta(weeks=8)
     delete_contests(time_from=now, time_to=eight_week_later)
@@ -131,10 +142,13 @@ def main():
         print("There is no upcoming contests.")
         sys.exit()
 
+    counter = 0
     for event in event_list:
         if event.start.time > eight_week_later:
             continue
+        counter += 1
         add_event(event, now)
+    print(f'{counter} events have been added.')
 
 if __name__ == '__main__':
     main()
