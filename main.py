@@ -1,7 +1,8 @@
 #from __future__ import print_function
-import sys
+import sys, os
 import datetime
 import requests, bs4
+import json
 import urllib.parse as urlparse
 from datetime import datetime as dt
 from typing import Final, List, Any
@@ -12,8 +13,8 @@ from googleapiclient.discovery import build
 from modules.calendar_event import CalendarEvent
 
 SCOPES: Final[List[str]] = ['https://www.googleapis.com/auth/calendar']
-API_CRED_FILE_PATH: Final[str] = "./ServiceAccount.json"
-API_CREDENTIAL: Final[Any] = service_account.Credentials.from_service_account_file(API_CRED_FILE_PATH, scopes=SCOPES)
+CREDENTIAL_JSON = json.load(os.environ.get('CREDENTIAL_JSON'))
+API_CREDENTIAL: Final[Any] = service_account.Credentials.from_service_account_file(CREDENTIAL_JSON, scopes=SCOPES)
 API_SERVICE: Final[Any] = build('calendar', 'v3', credentials=API_CREDENTIAL)
 CALENDAR_ID: Final[Any] = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
 ATCODER_BASE_URL: Final[str] = 'https://atcoder.jp/'
