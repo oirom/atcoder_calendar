@@ -1,8 +1,9 @@
 #from __future__ import print_function
-import sys, os
+import json
+import os
+import sys
 import datetime
 import requests, bs4
-import json
 import urllib.parse as urlparse
 from datetime import datetime as dt
 from typing import List, Dict
@@ -11,7 +12,16 @@ from dataclasses import dataclass, InitVar, field
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-
+SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
+CREDENTIAL_INFO: Dict[str, str] = json.loads(os.environ.get('CREDENTIAL_INFO'))
+# ローカルテスト用
+# with open('credential.json') as f:
+#     print(f"f: {f}")
+#     CREDENTIAL_INFO = json.load(f)
+API_CREDENTIAL = service_account.Credentials.from_service_account_info(CREDENTIAL_INFO, scopes=SCOPES)
+API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL, cache_discovery=False)
+CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
+ATCODER_BASE_URL: str = 'https://atcoder.jp/'
 @dataclass
 class TimeWithStrTimeZone:
     time: datetime.datetime
@@ -62,19 +72,6 @@ class CalendarEvent:
             'end': self.end.get_as_obj()
         }
 
-
-SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
-
-CREDENTIAL_JSON = json.loads(os.environ.get('CREDENTIAL_JSON'))
-
-# ローカルテスト用
-# with open('tmp.json') as f:
-#     CREDENTIAL_JSON = json.load(f)
-
-API_CREDENTIAL = service_account.Credentials.from_service_account_info(CREDENTIAL_JSON, scopes=SCOPES)
-API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL)
-CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
-ATCODER_BASE_URL: str = 'https://atcoder.jp/'
 
 def parse_event(name_obj, start_datetime_obj, duration_obj) -> CalendarEvent:
     contest_title = name_obj.text
@@ -130,7 +127,7 @@ def delete_contests(time_from, time_to):
             eventId=event['id']
         ).execute()
 
-def main():
+def main(data, context):
     event_list = get_atcoder_schedule()
     print(f"{len(event_list)} contests have been retrieved.")
     now = datetime.datetime.utcnow()
