@@ -5,19 +5,70 @@ import requests, bs4
 import json
 import urllib.parse as urlparse
 from datetime import datetime as dt
-from typing import Final, List, Any
+from typing import List, Dict
+from dataclasses import dataclass, InitVar, field
 
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
-from modules.calendar_event import CalendarEvent
 
-SCOPES: Final[List[str]] = ['https://www.googleapis.com/auth/calendar']
-CREDENTIAL_JSON = json.load(os.environ.get('CREDENTIAL_JSON'))
-API_CREDENTIAL: Final[Any] = service_account.Credentials.from_service_account_file(CREDENTIAL_JSON, scopes=SCOPES)
-API_SERVICE: Final[Any] = build('calendar', 'v3', credentials=API_CREDENTIAL)
-CALENDAR_ID: Final[Any] = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
-ATCODER_BASE_URL: Final[str] = 'https://atcoder.jp/'
+@dataclass
+class TimeWithStrTimeZone:
+    time: datetime.datetime
+    time_zone: str = 'Japan'
+
+    def get_as_obj(self):
+        return {
+            'dateTime': self.time.isoformat(timespec='seconds'),
+            'timeZone': self.time_zone
+        }
+
+@dataclass
+class CalendarEvent:
+    summary: str
+    start_at: InitVar[datetime.datetime]
+    end_at: InitVar[datetime.datetime]
+    start: TimeWithStrTimeZone = field(init=False)
+    end: TimeWithStrTimeZone = field(init=False)
+    location: str = ''
+    description: str = ''
+
+    def __post_init__(self, start_at, end_at):
+        self.start = TimeWithStrTimeZone(start_at)
+        self.end = TimeWithStrTimeZone(end_at)
+    
+    def get_as_obj(self):
+        '''
+        以下のような形で返す
+        {
+            'summary': 'ABC001',
+            'location': '',
+            'description': 'https://atcoder.jp/contests/abc001',
+            'start': {
+                'dateTime': '2020-01-01T00:00:00',
+                'timeZone': 'Japan',
+            },
+            'end': {
+                'dateTime': '2020-01-01T01:00:00',
+                'timeZone': 'Japan',
+            }
+        }
+        '''
+        return {
+            'summary': self.summary,
+            'location': self.location,
+            'description': self.description,
+            'start': self.start.get_as_obj(),
+            'end': self.end.get_as_obj()
+        }
+
+
+SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
+CREDENTIAL_JSON: Dict[str, str] = json.load(os.environ.get('CREDENTIAL_JSON'))
+API_CREDENTIAL = service_account.Credentials.from_service_account_file(CREDENTIAL_JSON, scopes=SCOPES)
+API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL)
+CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
+ATCODER_BASE_URL: str = 'https://atcoder.jp/'
 
 def parse_event(name_obj, start_datetime_obj, duration_obj) -> CalendarEvent:
     contest_title = name_obj.text
@@ -57,6 +108,7 @@ def add_event(event: CalendarEvent, created_at: datetime.datetime):
     if event.description:
         event.description += '\n'
     event.description += f'UPDATED AT: {created_at.isoformat()}'
+    print(event.description)
     added_event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
     print (added_event['id'])
 
