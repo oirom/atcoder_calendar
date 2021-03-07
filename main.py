@@ -79,7 +79,7 @@ def main():
         sys.exit()
 
     for event in event_list:
-        if event.start_at > eight_week_later:
+        if event.start.time > eight_week_later:
             continue
         add_event(event, now)
 
