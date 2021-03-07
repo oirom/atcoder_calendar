@@ -52,7 +52,10 @@ def get_atcoder_schedule() -> List[CalendarEvent]:
     return event_list
 
 # google calender api を使う部分．サンプルそのまま
-def add_event(event: CalendarEvent):
+def add_event(event: CalendarEvent, created_at: datetime.datetime):
+    if event.description:
+        event.description += '\n'
+    event.description += f'UPDATED AT: {created_at.isoformat()}'
     added_event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
     print (added_event['id'])
 
@@ -78,7 +81,7 @@ def main():
     for event in event_list:
         if event.start_at > eight_week_later:
             continue
-        add_event(event)
+        add_event(event, now)
 
 if __name__ == '__main__':
     main()
