@@ -16,7 +16,6 @@ SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
 CREDENTIAL_INFO: Dict[str, str] = json.loads(os.environ.get('CREDENTIAL_INFO'))
 # ローカルテスト用
 # with open('credential.json') as f:
-#     print(f"f: {f}")
 #     CREDENTIAL_INFO = json.load(f)
 API_CREDENTIAL = service_account.Credentials.from_service_account_info(CREDENTIAL_INFO, scopes=SCOPES)
 API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL, cache_discovery=False)
@@ -115,14 +114,24 @@ def add_updated_at(event: CalendarEvent, updated_at: datetime.datetime):
 def add_event(event: CalendarEvent, created_at: datetime.datetime):
     add_updated_at(event, created_at)
     added_event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
-    print (added_event['id'])
 
 def get_registered_events(time_from: datetime.datetime, time_to: datetime.datetime):
-    return API_SERVICE.events().list(
-        calendarId=CALENDAR_ID,
-        timeMin=f"{time_from.isoformat()}Z",
-        timeMax=f"{time_to.isoformat()}Z",
-    ).execute()['items']
+    registered_events = []
+    
+    page_token = None
+    while True:
+        events = API_SERVICE.events().list(
+            calendarId=CALENDAR_ID,
+            timeMin=f"{time_from.isoformat()}Z",
+            timeMax=f"{time_to.isoformat()}Z",
+            pageToken=page_token
+        ).execute()
+        registered_events += events['items']
+        page_token = events.get('nextPageToken')
+        if not page_token:
+            break
+
+    return registered_events
 
 def delete_events(time_from: datetime.datetime, time_to: datetime.datetime):
     events_to_delete = get_registered_events(time_from, time_to)
@@ -131,13 +140,14 @@ def delete_events(time_from: datetime.datetime, time_to: datetime.datetime):
             calendarId=CALENDAR_ID,
             eventId=event['id']
         ).execute()
+    print(f'{len(events_to_delete)} events have been deleted.')
 
 def update_event(event_id: str, event: CalendarEvent, updated_at: datetime.datetime):
     add_updated_at(event, updated_at)
     API_SERVICE.events().update(
         calendarId=CALENDAR_ID,
         eventId=event_id,
-        body=event
+        body=event.get_as_obj()
     ).execute()
 
 def main(data, context):
@@ -145,9 +155,7 @@ def main(data, context):
     print(f"{len(upcoming_contests)} contests have been retrieved.")
     now = datetime.datetime.utcnow()
     eight_week_later = now + datetime.timedelta(weeks=8)
-    delete_events(time_from=now, time_to=eight_week_later)
 
-    # 取得した各コンテストについてループ
     if not upcoming_contests:
         print("There is no upcoming contests.")
         sys.exit()
@@ -171,6 +179,8 @@ def main(data, context):
         inserted_count += 1
         add_event(uc, now)
     
+    print(f"{updated_count} contests have been updated.")
+    print(f"{inserted_count} contests have been added.")
 
 if __name__ == '__main__':
-    main()
+    main('', '')
