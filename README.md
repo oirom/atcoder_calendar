@@ -11,11 +11,3 @@ AtCoderの[公式（？）カレンダー](https://calendar.google.com/calendar/
 定期実行には Cloud Scheduler を活用しました．
 
 以下，main.py 内の関数ごとに解説を書いておこうと思います．
-
-## get_atcoder_schedule()
-
-## get_registered_event()
-
-## add_event()
-
-## main()
