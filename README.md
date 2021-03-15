@@ -9,5 +9,3 @@ AtCoderの[公式（？）カレンダー](https://calendar.google.com/calendar/
 # main.py
 こちらのソースコードを少し修正したものを Google Cloud Functions にアップロードして実行しています．
 定期実行には Cloud Scheduler を活用しました．
-
-以下，main.py 内の関数ごとに解説を書いておこうと思います．
