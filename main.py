@@ -84,7 +84,7 @@ def parse_event(name_obj, start_datetime_obj, duration_obj) -> CalendarEvent:
     )
 
 def get_atcoder_schedule() -> List[CalendarEvent]:
-    res = requests.get(urlparse.urljoin(ATCODER_BASE_URL, "contests"))
+    res = requests.get(urlparse.urljoin(ATCODER_BASE_URL, "contests/?lang=ja"))
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.content, 'html.parser')
 
