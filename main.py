@@ -105,14 +105,18 @@ def get_atcoder_schedule() -> List[CalendarEvent]:
 
     return event_list
 
-def add_updated_at(event: CalendarEvent, updated_at: datetime.datetime):
+def add_updated_at(event: CalendarEvent, updated_at: datetime.datetime, create: bool = False):
     if event.description:
         event.description += '\n'
     # HACK: UTC to JST
-    event.description += f"UPDATED AT: {(updated_at + datetime.timedelta(hours=9)).strftime('%Y/%m/%d %H:%M:%S')} JST"
+    updated_at_str: str = f"{(updated_at + datetime.timedelta(hours=9)).strftime('%Y/%m/%d %H:%M:%S')} JST"
+
+    if create:
+        event.description += f"CREATED AT: {updated_at_str}\n"
+    event.description += f"UPDATED AT: {updated_at_str}"
 
 def add_event(event: CalendarEvent, created_at: datetime.datetime):
-    add_updated_at(event, created_at)
+    add_updated_at(event, created_at, create=True)
     added_event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
 
 def get_registered_events(time_from: datetime.datetime, time_to: datetime.datetime):
@@ -142,7 +146,16 @@ def delete_events(time_from: datetime.datetime, time_to: datetime.datetime):
         ).execute()
     print(f'{len(events_to_delete)} events have been deleted.')
 
-def update_event(event_id: str, event: CalendarEvent, updated_at: datetime.datetime):
+def update_event(event_id: str, event_description: str, event: CalendarEvent, updated_at: datetime.datetime):
+    # Googleカレンダーの説明欄からCREATED ATを抜き出してeventにつける
+    description_lines = list(filter(lambda line: line != '', event_description.split('\n')))
+    # descriptionにURLとUPDATED ATしかつけてなかった時の名残のreplace
+    created_at_str = description_lines[1].replace('UPDATED AT: ', 'CREATED AT: ')
+    if event.description:
+        event.description += '\n'
+    event.description += created_at_str
+
+    # 更新時間を更新
     add_updated_at(event, updated_at)
     API_SERVICE.events().update(
         calendarId=CALENDAR_ID,
@@ -169,7 +182,7 @@ def main(data, context):
         for rc in registered_contests:
             if uc.summary == rc['summary']:
                 updated_count += 1
-                update_event(rc['id'], uc, now)
+                update_event(rc['id'], rc['description'], uc, now)
                 already_registered = True
                 break
 
