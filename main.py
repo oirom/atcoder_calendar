@@ -1,9 +1,7 @@
-#from __future__ import print_function
 import json
 import os
 import sys
 import datetime
-from dateutil import parser
 import requests, bs4
 import urllib.parse as urlparse
 from datetime import datetime as dt
@@ -22,6 +20,7 @@ API_CREDENTIAL = service_account.Credentials.from_service_account_info(CREDENTIA
 API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL, cache_discovery=False)
 CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
 ATCODER_BASE_URL: str = 'https://atcoder.jp/'
+
 @dataclass
 class TimeWithStrTimeZone:
     time: datetime.datetime
@@ -129,13 +128,19 @@ def add_updated_at(event: CalendarEvent, updated_at: datetime.datetime, create: 
 def add_event(event: CalendarEvent):
     added_event = API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
 
+def parse_datetime(t: str) -> datetime.datetime:
+    try:
+        return datetime.datetime.strptime(t, "%Y-%m-%dT%H:%M:%S%z")
+    except:
+        return datetime.datetime.strptime(t, "%Y-%m-%dT%H:%M:%S.%f%z")
+
 def parse_event(event_item_obj) -> CalendarEvent:
     return CalendarEvent(
         summary=event_item_obj['summary'],
-        created_at=parser.parse(event_item_obj['created']),
-        updated_at=parser.parse(event_item_obj['updated']),
-        start_at=parser.parse(event_item_obj['start']['dateTime']),
-        end_at=parser.parse(event_item_obj['end']['dateTime']),
+        created_at=parse_datetime(event_item_obj['created']),
+        updated_at=parse_datetime(event_item_obj['updated']),
+        start_at=parse_datetime(event_item_obj['start']['dateTime']),
+        end_at=parse_datetime(event_item_obj['end']['dateTime']),
         id=event_item_obj['id']
     )
 
