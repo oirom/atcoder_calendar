@@ -10,3 +10,7 @@ AtCoderの[公式（？）カレンダー](https://calendar.google.com/calendar/
 こちらのソースコードを少し修正したものを Google Cloud Functions にアップロードして実行しています。
 
 定期実行には Cloud Scheduler を活用しました。
+
+# リンタの掛け方
+※pylint のインストールが必要です。  
+`pylint --rcfile=./pylintrc main.py`
