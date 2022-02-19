@@ -144,6 +144,14 @@ class CalendarEvent:
             url=contest_url
         )
 
+    @classmethod
+    def are_same_contests(cls, contest: "CalendarEvent", another_contest: "CalendarEvent") -> bool:
+        return (
+            contest.summary == another_contest.summary
+            or
+            contest.url == another_contest.url
+        )
+
 def utc_to_jst_str(time: datetime.datetime) -> str:
     """
     :returns: Time converted to JST as string
@@ -242,7 +250,7 @@ def main(data, context):
     for upcoming in upcoming_contests:
         already_registered = False
         for registered in registered_contests:
-            if upcoming.summary == registered.summary:
+            if CalendarEvent.are_same_contests(upcoming, registered):
                 updated_count += 1
                 update_event(registered, upcoming)
                 already_registered = True
