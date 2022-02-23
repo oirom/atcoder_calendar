@@ -1,5 +1,6 @@
 ignore_dir
 credentials.json
+credential.json
 test.py
 token.pickle
 tokens.txt
