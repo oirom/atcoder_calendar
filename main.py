@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import datetime
 import urllib.parse as urlparse
@@ -15,15 +16,22 @@ from googleapiclient.discovery import build
 SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
 
 CREDENTIAL_INFO: Dict[str, str] = {}
+CALENDAR_TYPE: Final[str] = 'ABC' if os.environ.get('CALENDAR_TYPE') == 'ABC' else 'ALL'
+
 if os.environ.get('ENV') == 'local':
     # ローカルでテスト
     # `ENV=local python3 main.py` みたいに使う
     print(f'Running in {os.environ.get("ENV")}.')
-    CREDENTIAL_FILE_NAME: Final[str] = 'credential.json'
+    if CALENDAR_TYPE == 'ABC':
+        print('Updating ABC calendar...')
+        CREDENTIAL_FILE_NAME: str = 'credential_for_abc.json'
+    else:
+        print('Updating AtCoder calendar...')
+        CREDENTIAL_FILE_NAME: str = 'credential.json'
     if not os.path.exists(CREDENTIAL_FILE_NAME):
         print(f'{CREDENTIAL_FILE_NAME} does not exist.')
         exit(1)
-    CREDENTIAL_INFO = json.load(open('credential.json'))
+    CREDENTIAL_INFO = json.load(open(CREDENTIAL_FILE_NAME))
 else:
     # 本番環境で実行されている
     print('Running in production.')
@@ -33,13 +41,17 @@ else:
         print('If you meant to run this in local,')
         print(f'try `ENV=local python3 {__file__}`')
         exit(1)
-    CREDENTIAL_INFO = json.loads(os.environ.get('CREDENTIAL_INFO'))
+    CREDENTIAL_INFO = json.loads(os.environ.get(CREDENTIAL_VARIABLE_NAME))
 
 API_CREDENTIAL = service_account.Credentials.from_service_account_info(
     CREDENTIAL_INFO, scopes=SCOPES
 )
 API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL, cache_discovery=False)
-CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
+if CALENDAR_TYPE == 'ABC':
+    CALENDAR_ID: str = '74149il1jgs77vpujlp6qrb89g@group.calendar.google.com'
+else:
+    CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
+
 ATCODER_BASE_URL: str = 'https://atcoder.jp/'
 
 @dataclass
@@ -102,6 +114,13 @@ class CalendarEvent:
             'start': self.start_at_with_time_zone.get_as_obj(),
             'end': self.end_at_with_timw_zone.get_as_obj()
         }
+
+    def is_abc(self) -> bool:
+        m = re.search(r"\/abc\d{3}$", self.url)
+        if m is None:
+            return False
+
+        return True
 
     @classmethod
     def parse_event(cls, event_item_obj: dict) -> "CalendarEvent":
@@ -248,6 +267,10 @@ def main(data, context):
 
     registered_contests = get_registered_events(now, eight_week_later)
     for upcoming in upcoming_contests:
+        if CALENDAR_TYPE == 'ABC':
+            if not upcoming.is_abc():
+                continue
+
         already_registered = False
         for registered in registered_contests:
             if CalendarEvent.are_same_contests(upcoming, registered):
