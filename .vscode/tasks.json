@@ -1,0 +1,17 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "[AtCoder ALL] Update calendar",
+            "type": "shell",
+            "command": "ENV=local python3 main.py"
+        },
+        {
+            "label": "[Only ABC] Update calendar",
+            "type": "shell",
+            "command": "ENV=local CALENDAR_TYPE=ABC python3 main.py"
+        }
+    ]
+}
