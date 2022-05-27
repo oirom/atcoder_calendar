@@ -72,10 +72,10 @@ class CalendarEvent:
     updated_at: datetime.datetime
     start_at: InitVar[datetime.datetime]
     end_at: InitVar[datetime.datetime]
+    url: str
     start_at_with_time_zone: TimeWithStrTimeZone = field(init=False)
     end_at_with_timw_zone: TimeWithStrTimeZone = field(init=False)
     id: str = ''
-    url: str = ''
 
     def __post_init__(self, start_at, end_at):
         self.start_at_with_time_zone = TimeWithStrTimeZone(start_at)
@@ -134,6 +134,7 @@ class CalendarEvent:
             updated_at=parse_datetime(event_item_obj['updated']),
             start_at=parse_datetime(event_item_obj['start']['dateTime']),
             end_at=parse_datetime(event_item_obj['end']['dateTime']),
+            url=event_item_obj['location'],
             id=event_item_obj['id']
         )
 
