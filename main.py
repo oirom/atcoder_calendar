@@ -201,9 +201,6 @@ def get_atcoder_schedule(now: datetime.datetime) -> List[CalendarEvent]:
 
     return event_list
 
-def add_event(event: CalendarEvent):
-    API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
-
 def parse_datetime(t: str) -> datetime.datetime:
     try:
         return datetime.datetime.strptime(t, "%Y-%m-%dT%H:%M:%S%z")
@@ -252,6 +249,9 @@ def update_event(registered_event: CalendarEvent, retrieved_event: CalendarEvent
         eventId=registered_event.id,
         body=retrieved_event.get_as_obj()
     ).execute()
+
+def add_event(event: CalendarEvent):
+    API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
 
 def main(data, context):
     now = datetime.datetime.utcnow()
