@@ -68,6 +68,16 @@ class TimeWithStrTimeZone:
             'timeZone': self.time_zone
         }
 
+    def __eq__(self, other: "TimeWithStrTimeZone") -> bool:
+        return (
+            self.time.year == other.time.year and
+            self.time.month == other.time.month and
+            self.time.day == other.time.day and
+            self.time.hour == other.time.hour and
+            self.time.minute == other.time.minute and
+            self.time_zone == other.time_zone
+        )
+
 @dataclass
 class CalendarEvent:
     summary: str
@@ -91,7 +101,7 @@ class CalendarEvent:
         """
         created_at_jst_str: Final[str] = utc_to_jst_str(self.created_at)
         updated_at_jst_str: Final[str] = utc_to_jst_str(self.updated_at)
-        return f"created at: {created_at_jst_str}\nupdated at: {updated_at_jst_str}"
+        return f"created at: {created_at_jst_str}\nlast modified at: {updated_at_jst_str}"
 
     def get_as_obj(self) -> dict:
         """
@@ -101,7 +111,7 @@ class CalendarEvent:
             'summary': 'ABC001',
             'location': 'https://atcoder.jp/contests/abc001',
             'description':
-                'created at: 2021/08/20 23:00:11 JST\nupdated at: 2021/08/28 16:34:11 JST',
+                'created at: 2021/08/20 23:00:11 JST\nlast modified at: 2021/08/28 16:34:11 JST',
             'start': {
                 'dateTime': '2020-01-01T00:00:00',
                 'timeZone': 'Japan',
@@ -171,6 +181,29 @@ class CalendarEvent:
             end_at=end_at,
             url=contest_url
         )
+
+    @classmethod
+    def update_for_diff(cls,
+                        old_event: "CalendarEvent",
+                        new_event: "CalendarEvent",
+                        batch: Union[BatchHttpRequest, None] = None) -> bool:
+        """Update old_event only when they have difference
+
+        Args:
+            old_event (CalendarEvent): Old event, that's registered to calendar
+            new_event (CalendarEvent): New (same) event with up-to-date info
+
+        Returns:
+            bool: Whether or not the old event is updated
+        """
+        if (old_event.summary == new_event.summary and
+            old_event.url == new_event.url and
+            old_event.start_at_with_time_zone == new_event.start_at_with_time_zone and
+            old_event.end_at_with_timw_zone == new_event.end_at_with_timw_zone):
+            return False
+
+        update_event(old_event, new_event, batch)
+        return True
 
 
 def utc_to_jst_str(time: datetime.datetime) -> str:
@@ -341,21 +374,26 @@ def main(data, context):
 
         # 2 contests are the same contest if they have either same summary (title) or url
         if upcoming.summary in summary_to_registered:
-            updated_count += 1
             registered = summary_to_registered[upcoming.summary]
-            update_event(registered, upcoming, batch)
+            if CalendarEvent.update_for_diff(registered, upcoming, batch):
+                updated_count += 1
+
             continue
 
         if upcoming.url in url_to_registered:
-            updated_count += 1
             registered = url_to_registered[upcoming.url]
-            update_event(registered, upcoming, batch)
+            if CalendarEvent.update_for_diff(registered, upcoming, batch):
+                updated_count += 1
+
             continue
 
         inserted_count += 1
         add_event(upcoming, batch)
+    print("requesting")
 
     batch.execute()
+
+    print("done")
 
     print(f"{updated_count} contests have been updated.")
     print(f"{inserted_count} contests have been added.")
