@@ -323,11 +323,10 @@ def update_event(registered_event: CalendarEvent,
     if batch:
         batch.add(
             # pylint: disable=no-member
-            API_SERVICE.events().update(
-            calendarId=CALENDAR_ID,
-            eventId=registered_event.id,
-            body=retrieved_event.get_as_obj()
-        ))
+            API_SERVICE.events().update(calendarId=CALENDAR_ID,
+                                        eventId=registered_event.id,
+                                        body=retrieved_event.get_as_obj())
+        )
         return
 
     # pylint: disable=no-member
@@ -389,12 +388,12 @@ def main(data, context):
 
         inserted_count += 1
         add_event(upcoming, batch)
-    print("requesting")
 
+    print("Batch request staring...")
     batch.execute()
+    print("done!")
 
-    print("done")
-
+    print()
     print(f"{updated_count} contests have been updated.")
     print(f"{inserted_count} contests have been added.")
 
