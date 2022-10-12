@@ -181,7 +181,7 @@ def utc_to_jst_str(time: datetime.datetime) -> str:
 
 
 def get_atcoder_schedule(now: datetime.datetime) -> List[CalendarEvent]:
-    res = requests.get(urlparse.urljoin(ATCODER_BASE_URL, "contests/?lang=ja"))
+    res = requests.get(urlparse.urljoin(ATCODER_BASE_URL, "contests/?lang=ja"), timeout=10)
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.content, 'html.parser')
 
