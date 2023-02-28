@@ -1,29 +1,39 @@
 import json
 import os
+import re
 import sys
 import datetime
 import urllib.parse as urlparse
 from datetime import datetime as dt
-from typing import Final, List, Dict
+from typing import Final, List, Dict, Tuple, Union
 from dataclasses import dataclass, InitVar, field
 
 import requests
 import bs4
 from google.oauth2 import service_account
-from googleapiclient.discovery import build
+from googleapiclient.discovery import build, BatchHttpRequest
 
 SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
 
 CREDENTIAL_INFO: Dict[str, str] = {}
+CALENDAR_TYPE: Final[str] = 'ABC' if os.environ.get('CALENDAR_TYPE') == 'ABC' else 'ALL'
+
 if os.environ.get('ENV') == 'local':
     # ローカルでテスト
     # `ENV=local python3 main.py` みたいに使う
     print(f'Running in {os.environ.get("ENV")}.')
-    CREDENTIAL_FILE_NAME: Final[str] = 'credential.json'
+    if CALENDAR_TYPE == 'ABC':
+        print('Updating ABC calendar...')
+        CREDENTIAL_FILE_NAME: str = 'credential_for_abc.json'
+    else:
+        print('Updating AtCoder calendar...')
+        CREDENTIAL_FILE_NAME: str = 'credential.json'
     if not os.path.exists(CREDENTIAL_FILE_NAME):
         print(f'{CREDENTIAL_FILE_NAME} does not exist.')
-        exit(1)
-    CREDENTIAL_INFO = json.load(open('credential.json'))
+        sys.exit(1)
+
+    with open(CREDENTIAL_FILE_NAME, encoding="utf-8") as f:
+        CREDENTIAL_INFO = json.load(f)
 else:
     # 本番環境で実行されている
     print('Running in production.')
@@ -32,14 +42,19 @@ else:
         print(f'{CREDENTIAL_VARIABLE_NAME} is not set.')
         print('If you meant to run this in local,')
         print(f'try `ENV=local python3 {__file__}`')
-        exit(1)
-    CREDENTIAL_INFO = json.loads(os.environ.get('CREDENTIAL_INFO'))
+        sys.exit(1)
+
+    CREDENTIAL_INFO = json.loads(os.environ.get(CREDENTIAL_VARIABLE_NAME))
 
 API_CREDENTIAL = service_account.Credentials.from_service_account_info(
     CREDENTIAL_INFO, scopes=SCOPES
 )
 API_SERVICE = build('calendar', 'v3', credentials=API_CREDENTIAL, cache_discovery=False)
-CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
+if CALENDAR_TYPE == 'ABC':
+    CALENDAR_ID: str = '74149il1jgs77vpujlp6qrb89g@group.calendar.google.com'
+else:
+    CALENDAR_ID: str = 's1c5d19mg7bo08h10ucio8uni8@group.calendar.google.com'
+
 ATCODER_BASE_URL: str = 'https://atcoder.jp/'
 
 @dataclass
@@ -53,6 +68,16 @@ class TimeWithStrTimeZone:
             'timeZone': self.time_zone
         }
 
+    def __eq__(self, other: "TimeWithStrTimeZone") -> bool:
+        return (
+            self.time.year == other.time.year and
+            self.time.month == other.time.month and
+            self.time.day == other.time.day and
+            self.time.hour == other.time.hour and
+            self.time.minute == other.time.minute and
+            self.time_zone == other.time_zone
+        )
+
 @dataclass
 class CalendarEvent:
     summary: str
@@ -60,10 +85,11 @@ class CalendarEvent:
     updated_at: datetime.datetime
     start_at: InitVar[datetime.datetime]
     end_at: InitVar[datetime.datetime]
+    url: str
     start_at_with_time_zone: TimeWithStrTimeZone = field(init=False)
     end_at_with_timw_zone: TimeWithStrTimeZone = field(init=False)
+    # pylint: disable=invalid-name
     id: str = ''
-    url: str = ''
 
     def __post_init__(self, start_at, end_at):
         self.start_at_with_time_zone = TimeWithStrTimeZone(start_at)
@@ -75,7 +101,7 @@ class CalendarEvent:
         """
         created_at_jst_str: Final[str] = utc_to_jst_str(self.created_at)
         updated_at_jst_str: Final[str] = utc_to_jst_str(self.updated_at)
-        return f"created at: {created_at_jst_str}\nupdated at: {updated_at_jst_str}"
+        return f"created at: {created_at_jst_str}\nlast modified at: {updated_at_jst_str}"
 
     def get_as_obj(self) -> dict:
         """
@@ -84,7 +110,8 @@ class CalendarEvent:
         {
             'summary': 'ABC001',
             'location': 'https://atcoder.jp/contests/abc001',
-            'description': 'created at: 2021/08/20 23:00:11 JST\nupdated at: 2021/08/28 16:34:11 JST',
+            'description':
+                'created at: 2021/08/20 23:00:11 JST\nlast modified at: 2021/08/28 16:34:11 JST',
             'start': {
                 'dateTime': '2020-01-01T00:00:00',
                 'timeZone': 'Japan',
@@ -103,6 +130,13 @@ class CalendarEvent:
             'end': self.end_at_with_timw_zone.get_as_obj()
         }
 
+    def is_abc(self) -> bool:
+        m = re.search(r"\/abc\d{3}$", self.url)
+        if m is None:
+            return False
+
+        return True
+
     @classmethod
     def parse_event(cls, event_item_obj: dict) -> "CalendarEvent":
         """
@@ -115,6 +149,7 @@ class CalendarEvent:
             updated_at=parse_datetime(event_item_obj['updated']),
             start_at=parse_datetime(event_item_obj['start']['dateTime']),
             end_at=parse_datetime(event_item_obj['end']['dateTime']),
+            url=event_item_obj['location'],
             id=event_item_obj['id']
         )
 
@@ -125,7 +160,9 @@ class CalendarEvent:
         """
         :param name_obj: Object, which contains name and url of the contest, obtained from html
         :param start_datetime_obj: Object, which contains start time, obtained from html
-        :param duration_obj: Object, which contains duration time (1:30 as one hour and 30 minutes), obtained from html
+        :param duration_obj:
+            Object, which contains duration time (1:30 as one hour and 30 minutes),
+            obtained from html
         :param now: The time this program started
         :returns: Parsed Calendar Event
         """
@@ -133,7 +170,8 @@ class CalendarEvent:
         contest_url: str = urlparse.urljoin(ATCODER_BASE_URL, name_obj.attrs['href'])
         start_at: datetime.datetime = dt.strptime(start_datetime_obj.text, '%Y-%m-%d %H:%M:%S+0900')
         contest_hours, contest_minutes = map(int, duration_obj.text.split(':'))
-        contest_duration: datetime.timedelta = datetime.timedelta(hours=contest_hours, minutes=contest_minutes)
+        contest_duration: datetime.timedelta = datetime.timedelta(hours=contest_hours,
+                                                                  minutes=contest_minutes)
         end_at: datetime.datetime = start_at + contest_duration
         return CalendarEvent(
             summary=contest_title,
@@ -145,12 +183,28 @@ class CalendarEvent:
         )
 
     @classmethod
-    def are_same_contests(cls, contest: "CalendarEvent", another_contest: "CalendarEvent") -> bool:
-        return (
-            contest.summary == another_contest.summary
-            or
-            contest.url == another_contest.url
-        )
+    def update_for_diff(cls,
+                        old_event: "CalendarEvent",
+                        new_event: "CalendarEvent",
+                        batch: Union[BatchHttpRequest, None] = None) -> bool:
+        """Update old_event only when they have difference
+
+        Args:
+            old_event (CalendarEvent): Old event, that's registered to calendar
+            new_event (CalendarEvent): New (same) event with up-to-date info
+
+        Returns:
+            bool: Whether or not the old event is updated
+        """
+        if (old_event.summary == new_event.summary and
+            old_event.url == new_event.url and
+            old_event.start_at_with_time_zone == new_event.start_at_with_time_zone and
+            old_event.end_at_with_timw_zone == new_event.end_at_with_timw_zone):
+            return False
+
+        update_event(old_event, new_event, batch)
+        return True
+
 
 def utc_to_jst_str(time: datetime.datetime) -> str:
     """
@@ -160,7 +214,7 @@ def utc_to_jst_str(time: datetime.datetime) -> str:
 
 
 def get_atcoder_schedule(now: datetime.datetime) -> List[CalendarEvent]:
-    res = requests.get(urlparse.urljoin(ATCODER_BASE_URL, "contests/?lang=ja"))
+    res = requests.get(urlparse.urljoin(ATCODER_BASE_URL, "contests/?lang=ja"), timeout=10)
     res.raise_for_status()
     soup = bs4.BeautifulSoup(res.content, 'html.parser')
 
@@ -181,9 +235,7 @@ def get_atcoder_schedule(now: datetime.datetime) -> List[CalendarEvent]:
 
     return event_list
 
-def add_event(event: CalendarEvent):
-    API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
-
+# pylint: disable=invalid-name
 def parse_datetime(t: str) -> datetime.datetime:
     try:
         return datetime.datetime.strptime(t, "%Y-%m-%dT%H:%M:%S%z")
@@ -197,6 +249,7 @@ def get_registered_events(
 
     page_token = None
     while True:
+        # pylint: disable=no-member
         events = API_SERVICE.events().list(
             calendarId=CALENDAR_ID,
             timeMin=f"{time_from.isoformat()}Z",
@@ -212,27 +265,90 @@ def get_registered_events(
 
     return registered_events
 
+def get_registered_events_dict(
+        time_from: datetime.datetime, time_to: datetime.datetime
+    ) -> Tuple[Dict[str, CalendarEvent], Dict[str, CalendarEvent]]:
+    """Returns registered event dictionary
+    Args:
+        time_from (datetime.datetime): This function looks for events after this
+        time_to (datetime.datetime): This function looks for events after this
+
+    Returns:
+        Tuple[Dict[str, CalendarEvent], Dict[str, CalendarEvent]]:
+            first Dict -> key: event summary, value: event,
+            second Dict -> key: event url, value: event
+    """
+
+    summary_to_registered: Dict[str, CalendarEvent] = {}
+    url_to_registered: Dict[str, CalendarEvent] = {}
+
+    page_token = None
+    while True:
+        # pylint: disable=no-member
+        events = API_SERVICE.events().list(
+            calendarId=CALENDAR_ID,
+            timeMin=f"{time_from.isoformat()}Z",
+            timeMax=f"{time_to.isoformat()}Z",
+            pageToken=page_token
+        ).execute()
+        for event_item_obj in events["items"]:
+            event = CalendarEvent.parse_event(event_item_obj)
+            summary_to_registered[event.summary] = event
+            url_to_registered[event.url] = event
+
+        page_token = events.get('nextPageToken')
+        if not page_token:
+            break
+
+    return summary_to_registered, url_to_registered
+
 def delete_events(time_from: datetime.datetime, time_to: datetime.datetime):
     events_to_delete = get_registered_events(time_from, time_to)
     for event in events_to_delete:
+        # pylint: disable=no-member
         API_SERVICE.events().delete(
             calendarId=CALENDAR_ID,
             eventId=event.id
         ).execute()
     print(f'{len(events_to_delete)} events have been deleted.')
 
-def update_event(registered_event: CalendarEvent, retrieved_event: CalendarEvent) -> None:
+def update_event(registered_event: CalendarEvent,
+                 retrieved_event: CalendarEvent,
+                 batch: Union[BatchHttpRequest, None] = None) -> None:
     # created at: the time the registered event was created
     retrieved_event.created_at = registered_event.created_at
     # updated at: now
     # retrieved_event.updated_at is already "now"
 
+    if batch:
+        batch.add(
+            # pylint: disable=no-member
+            API_SERVICE.events().update(calendarId=CALENDAR_ID,
+                                        eventId=registered_event.id,
+                                        body=retrieved_event.get_as_obj())
+        )
+        return
+
+    # pylint: disable=no-member
     API_SERVICE.events().update(
         calendarId=CALENDAR_ID,
         eventId=registered_event.id,
         body=retrieved_event.get_as_obj()
     ).execute()
 
+def add_event(event: CalendarEvent, batch: Union[BatchHttpRequest, None] = None) -> None:
+    if batch:
+        batch.add(
+            # pylint: disable=no-member
+            API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj())
+        )
+        return
+
+    # pylint: disable=no-member
+    API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
+
+# These are needed in Cloud Functions
+# pylint: disable=unused-argument
 def main(data, context):
     now = datetime.datetime.utcnow()
     upcoming_contests = get_atcoder_schedule(now)
@@ -246,22 +362,38 @@ def main(data, context):
     updated_count = 0
     inserted_count = 0
 
-    registered_contests = get_registered_events(now, eight_week_later)
-    for upcoming in upcoming_contests:
-        already_registered = False
-        for registered in registered_contests:
-            if CalendarEvent.are_same_contests(upcoming, registered):
-                updated_count += 1
-                update_event(registered, upcoming)
-                already_registered = True
-                break
+    summary_to_registered, url_to_registered = get_registered_events_dict(now, eight_week_later)
 
-        if already_registered:
+    # pylint: disable=no-member
+    batch = API_SERVICE.new_batch_http_request()
+
+    for upcoming in upcoming_contests:
+        if CALENDAR_TYPE == 'ABC' and not upcoming.is_abc():
+            continue
+
+        # 2 contests are the same contest if they have either same summary (title) or url
+        if upcoming.summary in summary_to_registered:
+            registered = summary_to_registered[upcoming.summary]
+            if CalendarEvent.update_for_diff(registered, upcoming, batch):
+                updated_count += 1
+
+            continue
+
+        if upcoming.url in url_to_registered:
+            registered = url_to_registered[upcoming.url]
+            if CalendarEvent.update_for_diff(registered, upcoming, batch):
+                updated_count += 1
+
             continue
 
         inserted_count += 1
-        add_event(upcoming)
+        add_event(upcoming, batch)
 
+    print("Batch request staring...")
+    batch.execute()
+    print("done!")
+
+    print()
     print(f"{updated_count} contests have been updated.")
     print(f"{inserted_count} contests have been added.")
 

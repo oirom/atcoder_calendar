@@ -9,8 +9,7 @@ AtCoderの[公式（？）カレンダー](https://calendar.google.com/calendar/
 <img src="https://user-images.githubusercontent.com/49501934/131486820-cc17fa38-625c-4cba-9d8b-c8f2d5f89293.jpg" width="400px">
 
 # main.py
-こちらのソースコードを少し修正したものを Google Cloud Functions にアップロードして実行しています。
-
+このソースコードを Google Cloud Functions で実行しています。
 定期実行には Cloud Scheduler を活用しました。
 
 # リンタの掛け方
