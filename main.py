@@ -18,6 +18,8 @@ SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
 CREDENTIAL_INFO: Dict[str, str] = {}
 CALENDAR_TYPE: Final[str] = 'ABC' if os.environ.get('CALENDAR_TYPE') == 'ABC' else 'ALL'
 
+ABC_PATTERN = re.compile(r"\/abc\d{3}$")
+
 if os.environ.get('ENV') == 'local':
     # ローカルでテスト
     # `ENV=local python3 main.py` みたいに使う
@@ -131,7 +133,7 @@ class CalendarEvent:
         }
 
     def is_abc(self) -> bool:
-        m = re.search(r"\/abc\d{3}$", self.url)
+        m = ABC_PATTERN.search(self.url)
         if m is None:
             return False
 
