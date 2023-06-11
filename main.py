@@ -266,39 +266,20 @@ def get_registered_events(
     return registered_events
 
 def get_registered_events_dict(
-        time_from: datetime.datetime, time_to: datetime.datetime
-    ) -> Tuple[Dict[str, CalendarEvent], Dict[str, CalendarEvent]]:
-    """Returns registered event dictionary
+        registered_events: List[CalendarEvent]
+    ) -> Tuple[Dict[str, int], Dict[str, int]]:
+    """Returns dictionary that maps from event url/summary to event index
     Args:
-        time_from (datetime.datetime): This function looks for events after this
-        time_to (datetime.datetime): This function looks for events after this
+        registered_events (List[CalendarEvent]): List of registered events
 
     Returns:
-        Tuple[Dict[str, CalendarEvent], Dict[str, CalendarEvent]]:
-            first Dict -> key: event summary, value: event,
-            second Dict -> key: event url, value: event
+        Tuple[Dict[str, int], Dict[str, int]]:
+            first Dict -> key: event summary, value: index of registered event,
+            second Dict -> key: event url, value: index of registered event
     """
 
-    summary_to_registered: Dict[str, CalendarEvent] = {}
-    url_to_registered: Dict[str, CalendarEvent] = {}
-
-    page_token = None
-    while True:
-        # pylint: disable=no-member
-        events = API_SERVICE.events().list(
-            calendarId=CALENDAR_ID,
-            timeMin=f"{time_from.isoformat()}Z",
-            timeMax=f"{time_to.isoformat()}Z",
-            pageToken=page_token
-        ).execute()
-        for event_item_obj in events["items"]:
-            event = CalendarEvent.parse_event(event_item_obj)
-            summary_to_registered[event.summary] = event
-            url_to_registered[event.url] = event
-
-        page_token = events.get('nextPageToken')
-        if not page_token:
-            break
+    summary_to_registered: Dict[str, int] = {event.summary: i for i, event in enumerate(registered_events)}
+    url_to_registered: Dict[str, int] = {event.url: i for i, event in enumerate(registered_events)}
 
     return summary_to_registered, url_to_registered
 
@@ -351,7 +332,7 @@ def add_event(event: CalendarEvent, batch: Union[BatchHttpRequest, None] = None)
 # pylint: disable=unused-argument
 def main(data, context):
     now = datetime.datetime.utcnow()
-    upcoming_contests = get_atcoder_schedule(now)
+    upcoming_contests: List[CalendarEvent] = get_atcoder_schedule(now)
     print(f"{len(upcoming_contests)} contests have been retrieved.")
     eight_week_later = now + datetime.timedelta(weeks=8)
 
@@ -362,7 +343,8 @@ def main(data, context):
     updated_count = 0
     inserted_count = 0
 
-    summary_to_registered, url_to_registered = get_registered_events_dict(now, eight_week_later)
+    registered_events: List[CalendarEvent] = get_registered_events(now, eight_week_later)
+    summary_to_registered, url_to_registered = get_registered_events_dict(registered_events)
 
     # pylint: disable=no-member
     batch = API_SERVICE.new_batch_http_request()
@@ -373,14 +355,16 @@ def main(data, context):
 
         # 2 contests are the same contest if they have either same summary (title) or url
         if upcoming.summary in summary_to_registered:
-            registered = summary_to_registered[upcoming.summary]
+            index = summary_to_registered[upcoming.summary]
+            registered = registered_events[index]
             if CalendarEvent.update_for_diff(registered, upcoming, batch):
                 updated_count += 1
 
             continue
 
         if upcoming.url in url_to_registered:
-            registered = url_to_registered[upcoming.url]
+            index = url_to_registered[upcoming.url]
+            registered = registered_events[index]
             if CalendarEvent.update_for_diff(registered, upcoming, batch):
                 updated_count += 1
 
