@@ -330,6 +330,29 @@ def add_event(event: CalendarEvent, batch: Union[BatchHttpRequest, None] = None)
     # pylint: disable=no-member
     API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
 
+# WIP
+def delete_all_events():
+    now = datetime.datetime.utcnow()
+    eight_week_later = now + datetime.timedelta(weeks=8)
+    batch = API_SERVICE.new_batch_http_request()
+
+    offset = 0
+    events_to_delete = get_registered_events(now, eight_week_later)
+
+    ONE_BATCH_LIMIT = 995
+
+    while offset < len(events_to_delete):
+        end = min(len(events_to_delete), offset + ONE_BATCH_LIMIT)
+        for event in events_to_delete[offset:end]:
+            batch.add(
+                API_SERVICE.events().delete(
+                    calendarId=CALENDAR_ID,
+                    eventId=event.id
+                )
+            )
+        batch.execute()
+        offset = end
+
 # These are needed in Cloud Functions
 # pylint: disable=unused-argument
 def main(data, context):
