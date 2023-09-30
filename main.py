@@ -326,7 +326,7 @@ def add_event(event: CalendarEvent, batch: Union[BatchHttpRequest, None] = None)
     # pylint: disable=no-member
     API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
 
-# WIP
+# TODO(k1832): WIP. Refactor this.
 def delete_all_events():
     now = datetime.datetime.utcnow()
     eight_week_later = now + datetime.timedelta(weeks=8)
