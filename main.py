@@ -133,11 +133,7 @@ class CalendarEvent:
         }
 
     def is_abc(self) -> bool:
-        m = ABC_PATTERN.search(self.url)
-        if m is None:
-            return False
-
-        return True
+        return ABC_PATTERN.search(self.url) is not None
 
     @classmethod
     def parse_event(cls, event_item_obj: dict) -> "CalendarEvent":
