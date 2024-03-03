@@ -18,6 +18,8 @@ SCOPES: List[str] = ['https://www.googleapis.com/auth/calendar']
 CREDENTIAL_INFO: Dict[str, str] = {}
 CALENDAR_TYPE: Final[str] = 'ABC' if os.environ.get('CALENDAR_TYPE') == 'ABC' else 'ALL'
 
+ABC_PATTERN = re.compile(r"\/abc\d{3}$")
+
 if os.environ.get('ENV') == 'local':
     # ローカルでテスト
     # `ENV=local python3 main.py` みたいに使う
@@ -131,11 +133,7 @@ class CalendarEvent:
         }
 
     def is_abc(self) -> bool:
-        m = re.search(r"\/abc\d{3}$", self.url)
-        if m is None:
-            return False
-
-        return True
+        return ABC_PATTERN.search(self.url) is not None
 
     @classmethod
     def parse_event(cls, event_item_obj: dict) -> "CalendarEvent":
@@ -266,39 +264,20 @@ def get_registered_events(
     return registered_events
 
 def get_registered_events_dict(
-        time_from: datetime.datetime, time_to: datetime.datetime
-    ) -> Tuple[Dict[str, CalendarEvent], Dict[str, CalendarEvent]]:
-    """Returns registered event dictionary
+        registered_events: List[CalendarEvent]
+    ) -> Tuple[Dict[str, int], Dict[str, int]]:
+    """Returns dictionary that maps from event url/summary to event index
     Args:
-        time_from (datetime.datetime): This function looks for events after this
-        time_to (datetime.datetime): This function looks for events after this
+        registered_events (List[CalendarEvent]): List of registered events
 
     Returns:
-        Tuple[Dict[str, CalendarEvent], Dict[str, CalendarEvent]]:
-            first Dict -> key: event summary, value: event,
-            second Dict -> key: event url, value: event
+        Tuple[Dict[str, int], Dict[str, int]]:
+            first Dict -> key: event summary, value: index of registered event,
+            second Dict -> key: event url, value: index of registered event
     """
 
-    summary_to_registered: Dict[str, CalendarEvent] = {}
-    url_to_registered: Dict[str, CalendarEvent] = {}
-
-    page_token = None
-    while True:
-        # pylint: disable=no-member
-        events = API_SERVICE.events().list(
-            calendarId=CALENDAR_ID,
-            timeMin=f"{time_from.isoformat()}Z",
-            timeMax=f"{time_to.isoformat()}Z",
-            pageToken=page_token
-        ).execute()
-        for event_item_obj in events["items"]:
-            event = CalendarEvent.parse_event(event_item_obj)
-            summary_to_registered[event.summary] = event
-            url_to_registered[event.url] = event
-
-        page_token = events.get('nextPageToken')
-        if not page_token:
-            break
+    summary_to_registered: Dict[str, int] = {event.summary: i for i, event in enumerate(registered_events)}
+    url_to_registered: Dict[str, int] = {event.url: i for i, event in enumerate(registered_events)}
 
     return summary_to_registered, url_to_registered
 
@@ -347,11 +326,34 @@ def add_event(event: CalendarEvent, batch: Union[BatchHttpRequest, None] = None)
     # pylint: disable=no-member
     API_SERVICE.events().insert(calendarId=CALENDAR_ID, body=event.get_as_obj()).execute()
 
+# TODO(k1832): WIP. Refactor this.
+def delete_all_events():
+    now = datetime.datetime.utcnow()
+    eight_week_later = now + datetime.timedelta(weeks=8)
+    batch = API_SERVICE.new_batch_http_request()
+
+    offset = 0
+    events_to_delete = get_registered_events(now, eight_week_later)
+
+    ONE_BATCH_LIMIT = 995
+
+    while offset < len(events_to_delete):
+        end = min(len(events_to_delete), offset + ONE_BATCH_LIMIT)
+        for event in events_to_delete[offset:end]:
+            batch.add(
+                API_SERVICE.events().delete(
+                    calendarId=CALENDAR_ID,
+                    eventId=event.id
+                )
+            )
+        batch.execute()
+        offset = end
+
 # These are needed in Cloud Functions
 # pylint: disable=unused-argument
 def main(data, context):
     now = datetime.datetime.utcnow()
-    upcoming_contests = get_atcoder_schedule(now)
+    upcoming_contests: List[CalendarEvent] = get_atcoder_schedule(now)
     print(f"{len(upcoming_contests)} contests have been retrieved.")
     eight_week_later = now + datetime.timedelta(weeks=8)
 
@@ -362,7 +364,8 @@ def main(data, context):
     updated_count = 0
     inserted_count = 0
 
-    summary_to_registered, url_to_registered = get_registered_events_dict(now, eight_week_later)
+    registered_events: List[CalendarEvent] = get_registered_events(now, eight_week_later)
+    summary_to_registered, url_to_registered = get_registered_events_dict(registered_events)
 
     # pylint: disable=no-member
     batch = API_SERVICE.new_batch_http_request()
@@ -373,14 +376,16 @@ def main(data, context):
 
         # 2 contests are the same contest if they have either same summary (title) or url
         if upcoming.summary in summary_to_registered:
-            registered = summary_to_registered[upcoming.summary]
+            index = summary_to_registered[upcoming.summary]
+            registered = registered_events[index]
             if CalendarEvent.update_for_diff(registered, upcoming, batch):
                 updated_count += 1
 
             continue
 
         if upcoming.url in url_to_registered:
-            registered = url_to_registered[upcoming.url]
+            index = url_to_registered[upcoming.url]
+            registered = registered_events[index]
             if CalendarEvent.update_for_diff(registered, upcoming, batch):
                 updated_count += 1
 
